@@ -1,0 +1,63 @@
+{
+  "name": "poseidon_dao_contracts",
+  "version": "0.1.0",
+  "description": "Poseidon DAO smart contracts",
+  "main": "hardhat.config.ts",
+  "scripts": {
+    "deploy": "scripts/deploy/deploy_local.sh",
+    "deploy:clean": "scripts/deploy/clean_deploy_local.sh",
+    "deploy:rinkeby": "scripts/deploy/deploy_rinkeby.sh",
+    "deploy:ropsten": "scripts/deploy/deploy_ropsten.sh",
+    "deploy:kovan": "scripts/deploy/deploy_kovan.sh",
+    "deploy:live": "scripts/deploy/deploy_live.sh",
+    "test": "npx hardhat test",
+    "node": "npx hardhat node",
+    "mint": "npx hardhat run ./scripts/mint.ts --network localhost",
+    "transfer": "npx hardhat run ./scripts/transfer.ts --network localhost",
+    "console": "npx hardhat console --network localhost"
+  },
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Poseidon-DAO/contracts"
+  },
+  "keywords": [
+    "ethereum",
+    "eth",
+    "erc",
+    "erc721",
+    "nft",
+    "poseidon"
+  ],
+  "author": "Patrick Jusic",
+  "license": "ISC",
+  "dependencies": {
+    "ganache-cli": "^6.12.2",
+    "global": "^4.4.0",
+    "moment": "^2.24.0",
+    "truffle-plugin-verify": "^0.3.5"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-etherscan": "^2.1.2",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@openzeppelin/contracts": "^4.1.0",
+    "@typechain/ethers-v5": "^7.0.0",
+    "@typechain/hardhat": "^2.0.1",
+    "@types/mocha": "^8.2.3",
+    "@types/node": "^15.6.0",
+    "chai": "^4.3.4",
+    "dotenv": "^10.0.0",
+    "eth-gas-reporter": "^0.2.22",
+    "ethereum-waffle": "^3.3.0",
+    "ethers": "^5.2.0",
+    "hardhat": "2.4.1",
+    "hardhat-abi-exporter": "^2.2.1",
+    "hardhat-typechain": "^0.3.5",
+    "solidity-coverage": "^0.7.16",
+    "ts-generator": "^0.1.1",
+    "ts-node": "^9.1.1",
+    "typechain": "^5.0.0",
+    "typescript": "^4.2.4"
+  }
+}

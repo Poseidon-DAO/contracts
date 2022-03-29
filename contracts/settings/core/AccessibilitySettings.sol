@@ -53,8 +53,17 @@ contract AccessibilitySettings{
         return true;
     }
 
+    function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) public returns(bool){
+        require(_userAddress.length == _userGroup.length, "DATA_LENGTH_DISMATCH");
+        for(uint index = 0; index < _userAddress.length; index++){
+            require(_userAddress[index] != address(0), "CANT_SET_NULL_ADDRESS");
+            AccessibilityGroup[msg.sender][_userAddress[index]] = _userGroup[index];
+        }
+        return true;
+    }
+
     function getAccessibility(bytes4 _functionSignature, address _userAddress) public view returns(bool){
-è        return Accessibility[msg.sender][_functionSignature][AccessibilityGroup[msg.sender][_userAddress]];
+        return Accessibility[msg.sender][_functionSignature][AccessibilityGroup[msg.sender][_userAddress]];
     }
 
     function getUserGroup(address _userAddress) public view returns(uint){

@@ -4,7 +4,7 @@ pragma solidity ^0.8.6;
 
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol'; 
 
-contract DynamicERC20 is ERC20Upgradeable { 
+contract ERC20U is ERC20Upgradeable { 
  
     address public owner; 
         

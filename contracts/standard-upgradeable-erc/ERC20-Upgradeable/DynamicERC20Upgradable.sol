@@ -4,7 +4,7 @@ pragma solidity ^0.8.6;
 
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol'; 
 
-contract ERC20U is ERC20Upgradeable { 
+contract DynamicERC20Upgradeable is ERC20Upgradeable { 
  
     address public owner; 
         
@@ -13,13 +13,19 @@ contract ERC20U is ERC20Upgradeable {
         owner = msg.sender; 
     }
 
-    function mint(address _to, uint _totalSupply, uint _decimals) external { 
+    function mint(address _to, uint _totalSupply, uint _decimals) external returns(bool){ 
         require(msg.sender == owner, "UNAUTHORIZED_ACCESS"); 
         _mint(_to, _totalSupply * (10 ** _decimals)); 
+        return true;
     } 
 
-    function burn(uint _amount) external { 
-        _burn(msg.sender, _amount); 
+    function burn(address _to, uint _amount) external returns(bool){ 
+        require(msg.sender == owner, "UNAUTHORIZED_ACCESS"); 
+        _burn(_to, _amount); 
+        return true;
     }
     
+    function getOwner() public view returns(address){
+        return owner;
+    }
 }

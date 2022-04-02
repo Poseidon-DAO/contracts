@@ -172,9 +172,9 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         DynamicERC20Upgradeable tokenUpgradeable = new DynamicERC20Upgradeable();
         address tokenAddress = address(tokenUpgradeable);
         tokenUpgradeable.initialize(_tokenName, _tokenSymbol);
-        tokenUpgradeable.mint(address(this), _totalSupply, uint8(18));
+        tokenUpgradeable.mint(address(this), _totalSupply, uint(18));
         tokenReferreal[tokenAddress] = _referree;
-        emit CreateERC20UpgradeableEvent(msg.sender, _tokenName, _tokenSymbol, _totalSupply, uint8(18), _referree, tokenAddress);
+        emit CreateERC20UpgradeableEvent(msg.sender, _tokenName, _tokenSymbol, _totalSupply, 18, _referree, tokenAddress);
         return true;
     }
 
@@ -190,6 +190,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     function burnUpgradeableERC20Token(address _token, uint _amount) public returns(bool){
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
+        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
         require(address(this) == IDERC20U.getOwner(), "OWNER_DISMATCH");
         IDERC20U.burn(_amount * (10 ** 18));
         return true;

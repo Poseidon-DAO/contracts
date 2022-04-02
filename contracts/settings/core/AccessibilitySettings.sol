@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import '../../interfaces/IDAOSetup.sol';
 
 contract AccessibilitySettings{
 
@@ -19,8 +20,8 @@ contract AccessibilitySettings{
 
     address superAdmin;
     
-    constructor (){
-        superAdmin = msg.sender;
+    constructor (address _superAdmin){
+        superAdmin = _superAdmin;         
     }
 
     modifier isSuperAdmin(){

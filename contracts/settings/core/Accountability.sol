@@ -5,8 +5,9 @@ pragma solidity ^0.8.0;
 import '../structures/MetaDataStructure.sol';
 import '../../shared/Signatures.sol';
 import '../../interfaces/IAccessibilitySettings.sol';
-import '../../interfaces/IDynamicERC20-Upgradeable.sol';
-import '../../standard-upgradeable-erc/ERC20-Upgradeable/DynamicERC20-Upgradeable.sol';
+import '../../interfaces/IDynamicERC20Upgradeable.sol';
+import '../../interfaces/IDAOSetup.sol';
+import '../../standard-upgradeable-erc/ERC20-Upgradeable/DynamicERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -30,6 +31,13 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     event RedeemEvent(address indexed caller, address indexed token, uint redeemAmount);
     event CreateERC20UpgradeableEvent(address caller, string tokenName, string tokenSymbol, uint totalSupply, uint8 decimals, address referee, address tokenUpgradeableAddress);
 
+    enum IndexSignaturesFriendlyName {
+        FUNCTION_ADDBALANCE_SIGNATURE,
+        FUNCTION_SUBBALANCE_SIGNATURE,
+        FUNCTION_SETUSERROLE_SIGNATURE,
+        FUNCTION_APPROVEERC20DISTR_SIGNATURE
+    }
+
     modifier onlyOwner(){
         require(owner == msg.sender, "ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
         _;
@@ -40,28 +48,29 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         _;
     }
 
-    constructor(address _accessibilitySettingsAddress) {
+    constructor(address _accessibilitySettingsAddress, address _DAOCreator) {
         require(_accessibilitySettingsAddress != address(0), "CANT_SET_TO_NULL_ADDRESS");
         IAS = IAccessibilitySettings(_accessibilitySettingsAddress); 
-        require(IAS.setUserRole(msg.sender, uint(UserGroup.ADMIN)), "COULDNT_SET_SENDER_SUCH_ADMIN");     // Who create the contract is admin
+        require(IAS.setUserRole(_DAOCreator, uint(UserGroup.ADMIN)), "COULDNT_SET_SENDER_SUCH_ADMIN");     // Who create the contract is admin
         require(IAS.setUserRole(address(this), uint(UserGroup.ADMIN)), "COULDNT_SET_SMARTCONTRACT_SUCH_ADMIN");  // The contract itself is admin too
       
-        owner = msg.sender;
+        owner = _DAOCreator;
 
         // ------------------------------------------------------------ List of function signatures
 
         bytes4[] memory signatures = new bytes4[](uint(3));         // Number of signatures
         uint[] memory userGroupAdminArray = new uint[](uint(1));    // Number of Group Admin
 
-        signatures[0] = FUNCTION_ADDBALANCE_SIGNATURE;
-        signatures[1] = FUNCTION_SUBBALANCE_SIGNATURE;
-        signatures[2] = FUNCTION_SETUSERROLE_SIGNATURE;
+        signatures[uint(IndexSignaturesFriendlyName.FUNCTION_ADDBALANCE_SIGNATURE)] = FUNCTION_ADDBALANCE_SIGNATURE;
+        signatures[uint(IndexSignaturesFriendlyName.FUNCTION_SUBBALANCE_SIGNATURE)] = FUNCTION_SUBBALANCE_SIGNATURE;
+        signatures[uint(IndexSignaturesFriendlyName.FUNCTION_SETUSERROLE_SIGNATURE)] = FUNCTION_SETUSERROLE_SIGNATURE;
+        signatures[uint(IndexSignaturesFriendlyName.FUNCTION_APPROVEERC20DISTR_SIGNATURE)] = FUNCTION_APPROVEERC20DISTR_SIGNATURE;
 
         userGroupAdminArray[0] = uint(UserGroup.ADMIN);
 
         functionSignatures = signatures;
 
-        require(IAS.enableSignature(signatures, userGroupAdminArray),"COULDNT_SET_PREDEFINED_SIGNATURES_TO_ADMIN");
+        require(IAS.enableSignature(signatures, userGroupAdminArray),"COULDNT_SET_PREDEFINED_SIGNATURES_TO_ADMIN");          
     }
 
     // ONLY OWNER FUNCTIONS 
@@ -87,13 +96,6 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     // PUBLIC FUNCTIONS WITH CHECK ACCESSIBILITY
 
-    function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) checkAccessibility(FUNCTION_SETUSERROLE_SIGNATURE, true) public returns(bool){
-        require(_userAddress.length == _userGroup.length, "DATA_LENGTH_DISMATCH");
-        IAS.setUserListRole(_userAddress,_userGroup);
-        //emit on Interface
-        return true;
-    }
-
     function addBalance(address _token, address _user, uint _amount) external checkAccessibility(FUNCTION_ADDBALANCE_SIGNATURE, true) returns(bool){
         require(_user != address(0), "CANT_ADD_BALANCE_ON_NULL_ADDRESS");
         require(_token != address(0), "TOKEN_CANT_BE_NULL_ADDRESS");
@@ -111,7 +113,14 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         uint newBalance = oldbalance.sub(_amount);
         accountability[_token][_user] = newBalance;
         emit ChangeBalanceEvent(msg.sender, _token, _user, oldbalance, newBalance);
-         return true;
+        return true;
+    }
+
+    function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) checkAccessibility(FUNCTION_SETUSERROLE_SIGNATURE, true) public returns(bool){
+        require(_userAddress.length == _userGroup.length, "DATA_LENGTH_DISMATCH");
+        IAS.setUserListRole(_userAddress,_userGroup);
+        //emit on Interface
+        return true;
     }
 
     function getFunctionSignatures() public view returns(bytes4[] memory){
@@ -123,7 +132,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     }
 
     // NEED TO APPROVE THIS SMART CONTRACT SUCH A SPENDER FROM THE OWNER OF THE ERC20
-    function approveERC20Distribution(address _token, uint _amount) public returns(bool){
+    function approveERC20Distribution(address _token, uint _amount) checkAccessibility(FUNCTION_APPROVEERC20DISTR_SIGNATURE, true) public returns(bool){
         require(_token != address(0), "CANT_REFER_TO_NULL_ADDRESS");
         require(_amount > 0, "CANT_APPROVE_NULL_AMOUNT");
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
@@ -137,7 +146,6 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         require(_token != address(0), "CANT_REFER_TO_NULL_ADDRESS");
         uint userBalance = getBalance(_token, msg.sender);
         require(userBalance > 0, "INSUFFICIENT_BALANCE");
-        accountability[_token][msg.sender] = uint(0);
         tokenListManagement[_token].transferFrom(address(this), msg.sender, userBalance);
         emit ChangeBalanceEvent(msg.sender, _token, msg.sender, userBalance, uint(0));
         emit RedeemEvent(msg.sender, _token, userBalance);
@@ -183,13 +191,14 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
         require(address(this) == IDERC20U.getOwner(), "OWNER_DISMATCH");
-        IDERC20U.burn(msg.sender, _amount * (10 ** 18));
+        IDERC20U.burn(_amount * (10 ** 18));
         return true;
     }
 
     // It should upgrade the ERC20 Upgradable token -> need to test it - check accessibility!!!!!! ->It's upgradeable for each token
-    function initializeUpgradableToken(address _tokenAddress) public initializer {
+    function initializeUpgradableToken(address _tokenAddress) public initializer returns(bool){
         tokenListManagement[_tokenAddress] = IERC20Upgradeable(_tokenAddress);
+        return true;
     }
 
     function getOwnUserGroupForThisSmartContract() public view returns(uint){

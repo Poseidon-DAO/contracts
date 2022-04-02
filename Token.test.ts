@@ -1,27 +1,24 @@
-// example file
-
-import chai, { expect } from "chai";
-import { ethers } from "hardhat";
-import { solidity } from "ethereum-waffle";
-import { Contract } from "ethers";
-
-chai.use(solidity);
-
-// const testURL = "https://test.ipfs.dweb.link";
+const { BN, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
+const { expect } = require('chai');
+const { ZERO_ADDRESS } = constants;
+const { ethers } = require('hardhat');
 
 async function deploy() {
-  const Token = await ethers.getContractFactory("Token");
-  return await Token.deploy();
+  const AccessibilitySettings = await ethers.getContractFactory("AccessibilitySettings");
+  return await AccessibilitySettings.deploy();
 }
 
-describe("Token contract", function () {
-  let deployed: Contract;
+
+describe("accessibilitySettings Contract", function () {
+  let deployed;
 
   beforeEach(async () => {
     deployed = await deploy();
+    const [owner] = await ethers.getSigners();
   });
 
-  // it("Token owner should change", async function () {
+  it("Token owner should change", async function () {
+    expect(true).to.equal(true);
   //   const [deployer, receiver] = await ethers.getSigners();
 
   //   const deployerAddress = await deployer.getAddress();
@@ -35,5 +32,5 @@ describe("Token contract", function () {
 
   //   expect(await deployed.ownerOf(1)).to.equal(await receiver.getAddress());
   //   expect(await deployed.tokenURI(1)).to.equal(testURL);
-  // });
+  });
 });

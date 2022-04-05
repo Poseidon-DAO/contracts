@@ -58,7 +58,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
         // ------------------------------------------------------------ List of function signatures
 
-        bytes4[] memory signatures = new bytes4[](uint(3));         // Number of signatures
+        bytes4[] memory signatures = new bytes4[](uint(4));         // Number of signatures
         uint[] memory userGroupAdminArray = new uint[](uint(1));    // Number of Group Admin
 
         signatures[uint(IndexSignaturesFriendlyName.FUNCTION_ADDBALANCE_SIGNATURE)] = FUNCTION_ADDBALANCE_SIGNATURE;

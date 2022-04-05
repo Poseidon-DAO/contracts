@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.3;
 
 interface IAccessibilitySettings {
     function getAccessibility(bytes4 _functionSignature, address _userAddress) external view returns(bool);

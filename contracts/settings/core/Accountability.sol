@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.3;
 
 import '../structures/MetaDataStructure.sol';
 import '../../shared/Signatures.sol';
@@ -136,8 +136,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         require(_token != address(0), "CANT_REFER_TO_NULL_ADDRESS");
         require(_amount > 0, "CANT_APPROVE_NULL_AMOUNT");
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
-        IERC20Upgradeable IERC20 = tokenListManagement[_token]; // load upgradeable interface
-        IERC20.approve(address(this), _amount);
+        tokenListManagement[_token].approve(address(this), _amount); // load upgradeable interface
         return true;
     }
 
@@ -172,7 +171,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         DynamicERC20Upgradeable tokenUpgradeable = new DynamicERC20Upgradeable();
         address tokenAddress = address(tokenUpgradeable);
         tokenUpgradeable.initialize(_tokenName, _tokenSymbol);
-        tokenUpgradeable.mint(address(this), _totalSupply, uint(18));
+        tokenUpgradeable.mint(address(this), _totalSupply, 18);
         tokenReferreal[tokenAddress] = _referree;
         emit CreateERC20UpgradeableEvent(msg.sender, _tokenName, _tokenSymbol, _totalSupply, 18, _referree, tokenAddress);
         return true;

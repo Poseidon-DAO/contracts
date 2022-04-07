@@ -18,4 +18,5 @@ interface IAccountability {
         function burnUpgradeableERC20Token(address _token, uint _amount) external returns(bool);
         function initializeUpgradableToken(address _tokenAddress) external returns(bool);
         function getOwnUserGroupForThisSmartContract() external view returns(uint);
+        function getDAOCreator() external view returns(address);
 }

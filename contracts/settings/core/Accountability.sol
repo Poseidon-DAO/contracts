@@ -16,8 +16,8 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
  
     using SafeMathUpgradeable for uint256;
 
-    address owner;
-    IAccessibilitySettings IAS;
+    address DAOCreator;
+    address accessibilitySettingsAddress;
 
     bytes4[] functionSignatures;
 
@@ -31,40 +31,35 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     event RedeemEvent(address indexed caller, address indexed token, uint redeemAmount);
     event CreateERC20UpgradeableEvent(address caller, string tokenName, string tokenSymbol, uint totalSupply, uint8 decimals, address referee, address tokenUpgradeableAddress);
 
-    enum IndexSignaturesFriendlyName {
-        FUNCTION_ADDBALANCE_SIGNATURE,
-        FUNCTION_SUBBALANCE_SIGNATURE,
-        FUNCTION_SETUSERROLE_SIGNATURE,
-        FUNCTION_APPROVEERC20DISTR_SIGNATURE
-    }
-
     modifier onlyOwner(){
-        require(owner == msg.sender, "ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
+        require(DAOCreator == msg.sender, "ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
         _;
     }
 
     modifier checkAccessibility(bytes4 _signature, bool _expectedValue){
-        require(IAS.getAccessibility(_signature, msg.sender) == _expectedValue, "FUNCTION_NOT_ALLOWED_TO_RUN_FROM_THIS_SMARTCONTRACT");
+        require(IAccessibilitySettings(accessibilitySettingsAddress).getAccessibility(_signature, msg.sender) == _expectedValue, "FUNCTION_NOT_ALLOWED_TO_RUN_FROM_THIS_SMARTCONTRACT");
         _;
     }
 
     constructor(address _accessibilitySettingsAddress, address _DAOCreator) {
-        require(_accessibilitySettingsAddress != address(0), "CANT_SET_TO_NULL_ADDRESS");
-        IAS = IAccessibilitySettings(_accessibilitySettingsAddress); 
+        require(_accessibilitySettingsAddress != address(0), "CANT_SET_NULL_ADDRESS");
+        require(_DAOCreator != address(0), "CANT_SET_NULL_ADDRESS");
+        accessibilitySettingsAddress = _accessibilitySettingsAddress;
+        IAccessibilitySettings IAS = IAccessibilitySettings(accessibilitySettingsAddress);
         require(IAS.setUserRole(_DAOCreator, uint(UserGroup.ADMIN)), "COULDNT_SET_SENDER_SUCH_ADMIN");     // Who create the contract is admin
         require(IAS.setUserRole(address(this), uint(UserGroup.ADMIN)), "COULDNT_SET_SMARTCONTRACT_SUCH_ADMIN");  // The contract itself is admin too
       
-        owner = _DAOCreator;
+        DAOCreator = _DAOCreator;
 
         // ------------------------------------------------------------ List of function signatures
 
         bytes4[] memory signatures = new bytes4[](uint(4));         // Number of signatures
         uint[] memory userGroupAdminArray = new uint[](uint(1));    // Number of Group Admin
 
-        signatures[uint(IndexSignaturesFriendlyName.FUNCTION_ADDBALANCE_SIGNATURE)] = FUNCTION_ADDBALANCE_SIGNATURE;
-        signatures[uint(IndexSignaturesFriendlyName.FUNCTION_SUBBALANCE_SIGNATURE)] = FUNCTION_SUBBALANCE_SIGNATURE;
-        signatures[uint(IndexSignaturesFriendlyName.FUNCTION_SETUSERROLE_SIGNATURE)] = FUNCTION_SETUSERROLE_SIGNATURE;
-        signatures[uint(IndexSignaturesFriendlyName.FUNCTION_APPROVEERC20DISTR_SIGNATURE)] = FUNCTION_APPROVEERC20DISTR_SIGNATURE;
+        signatures[0] = FUNCTION_ADDBALANCE_SIGNATURE;
+        signatures[1] = FUNCTION_SUBBALANCE_SIGNATURE;
+        signatures[2] = FUNCTION_SETUSERROLE_SIGNATURE;
+        signatures[3] = FUNCTION_APPROVEERC20DISTR_SIGNATURE;
 
         userGroupAdminArray[0] = uint(UserGroup.ADMIN);
 
@@ -77,20 +72,18 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     function changeAccessibilitySettings(address _accessibilitySettingsAddress) public onlyOwner returns(bool){
         require(_accessibilitySettingsAddress != address(0), "CANT_SET_TO_NULL_ADDRESS");
-        IAS = IAccessibilitySettings(_accessibilitySettingsAddress);
+        accessibilitySettingsAddress = _accessibilitySettingsAddress;
         emit ChangeAccessibilitySettingsAddressEvent(msg.sender, _accessibilitySettingsAddress);
         return true;
     }
 
     function enableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyOwner returns(bool){
-        IAS.enableSignature(_signatures, _userGroup);
-        //emit on Interface
+        IAccessibilitySettings(accessibilitySettingsAddress).enableSignature(_signatures, _userGroup);
         return true;
     }
 
     function disableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyOwner returns(bool){
-        IAS.disableSignature(_signatures, _userGroup);
-        //emit on Interface
+        IAccessibilitySettings(accessibilitySettingsAddress).disableSignature(_signatures, _userGroup);
         return true;
     }
 
@@ -118,7 +111,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) checkAccessibility(FUNCTION_SETUSERROLE_SIGNATURE, true) public returns(bool){
         require(_userAddress.length == _userGroup.length, "DATA_LENGTH_DISMATCH");
-        IAS.setUserListRole(_userAddress,_userGroup);
+        IAccessibilitySettings(accessibilitySettingsAddress).setUserListRole(_userAddress,_userGroup);
         //emit on Interface
         return true;
     }
@@ -202,6 +195,10 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     }
 
     function getOwnUserGroupForThisSmartContract() public view returns(uint){
-        return IAS.getUserGroup(msg.sender);
+        return IAccessibilitySettings(accessibilitySettingsAddress).getUserGroup(msg.sender);
+    }
+
+    function getDAOCreator() public view returns(address){
+        return DAOCreator;
     }
 }

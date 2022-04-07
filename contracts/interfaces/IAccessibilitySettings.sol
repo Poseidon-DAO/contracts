@@ -9,4 +9,5 @@ interface IAccessibilitySettings {
     function disableSignature(bytes4[] memory _functionSignatureList, uint[] memory _userRoles) external returns(bool);
     function setUserRole(address _userAddress, uint _userRoleLevel) external returns(bool);
     function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) external returns(bool);
+    function getDAOCreator() external view returns(address);
 }

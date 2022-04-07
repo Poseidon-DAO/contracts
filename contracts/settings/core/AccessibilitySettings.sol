@@ -4,7 +4,6 @@ pragma solidity ^0.8.3;
 
 
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import '../../interfaces/IDAOSetup.sol';
 
 contract AccessibilitySettings{
 
@@ -18,14 +17,15 @@ contract AccessibilitySettings{
     event ChangeUserGroupEvent(address indexed caller, address indexed user, uint newGroup);
     event ChangeGroupAccessibilityEvent(address indexed smartContractReference, bytes4 indexed functionSignature, uint groupReference, bool Accessibility);
 
-    address superAdmin;
+    address DAOCreator;
     
-    constructor (address _superAdmin){
-        superAdmin = _superAdmin;         
+    constructor (address _DAOCreator){
+        require(_DAOCreator != address(0), "CANT_SET_NULL_ADDRESS");
+        DAOCreator = _DAOCreator;         
     }
 
     modifier isSuperAdmin(){
-        require(superAdmin == msg.sender, "ONLY_SUPERADMIN_CAN_RUN_THIS");
+        require(DAOCreator == msg.sender, "ONLY_SUPERADMIN_CAN_RUN_THIS");
         _;
     }
 
@@ -78,5 +78,7 @@ contract AccessibilitySettings{
         return AccessibilityGroup[msg.sender][_userAddress];
     }
 
-    
+    function getDAOCreator() public view returns(address){
+        return DAOCreator;
+    }
 }

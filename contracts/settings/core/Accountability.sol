@@ -22,7 +22,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     bytes4[] functionSignatures;
 
     mapping(address => mapping(address => uint)) accountability; // TOKEN -> ADDRESS -> BALANCE
-    mapping(address => IERC20Upgradeable) tokenListManagement; // TOKEN => INTERFACE
+    mapping(address => bool) tokenListManagement; // TOKEN => ISPRESENT
     mapping(address => address) tokenReferreal; //TOKEN => ADDRESS (user reference that is "owner" of the token)
 
     event ChangeAccessibilitySettingsAddressEvent(address owner, address accessibilitySettingsAddress);
@@ -53,13 +53,14 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
         // ------------------------------------------------------------ List of function signatures
 
-        bytes4[] memory signatures = new bytes4[](uint(4));         // Number of signatures
+        bytes4[] memory signatures = new bytes4[](uint(5));         // Number of signatures
         uint[] memory userGroupAdminArray = new uint[](uint(1));    // Number of Group Admin
 
         signatures[0] = FUNCTION_ADDBALANCE_SIGNATURE;
         signatures[1] = FUNCTION_SUBBALANCE_SIGNATURE;
         signatures[2] = FUNCTION_SETUSERROLE_SIGNATURE;
-        signatures[3] = FUNCTION_APPROVEERC20DISTR_SIGNATURE;
+        signatures[3] = FUNCTION_CREATEERC20_SIGNATURE;
+        signatures[4] = FUNCTION_APPROVEERC20DISTR_SIGNATURE;
 
         userGroupAdminArray[0] = uint(UserGroup.ADMIN);
 
@@ -125,47 +126,44 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     }
 
     // NEED TO APPROVE THIS SMART CONTRACT SUCH A SPENDER FROM THE OWNER OF THE ERC20
-    function approveERC20Distribution(address _token, uint _amount) checkAccessibility(FUNCTION_APPROVEERC20DISTR_SIGNATURE, true) public returns(bool){
+    function approveERC20Distribution(address _token, uint _amount) public returns(bool){
         require(_token != address(0), "CANT_REFER_TO_NULL_ADDRESS");
         require(_amount > 0, "CANT_APPROVE_NULL_AMOUNT");
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
-        tokenListManagement[_token].approve(address(this), _amount); // load upgradeable interface
-        return true;
-    }
-
-    //To run this function we need to to allow this smartcontract to the IERC20
-    function redeemERC20(address _token) public returns(bool){
-        require(_token != address(0), "CANT_REFER_TO_NULL_ADDRESS");
-        uint userBalance = getBalance(_token, msg.sender);
-        require(userBalance > 0, "INSUFFICIENT_BALANCE");
-        tokenListManagement[_token].transferFrom(address(this), msg.sender, userBalance);
-        emit ChangeBalanceEvent(msg.sender, _token, msg.sender, userBalance, uint(0));
-        emit RedeemEvent(msg.sender, _token, userBalance);
+        IERC20Upgradeable(_token).approve(address(this), _amount); // load upgradeable interface
         return true;
     }
 
     function redeemListOfERC20(address[] memory _tokenList) public returns(bool){
         uint userBalance;
         address token;
+        bool result;
+        result = false;
+        IERC20Upgradeable IERC20U;
         for(uint index; index < _tokenList.length; index++){
             token = _tokenList[index];
             userBalance = getBalance(token, msg.sender);
             if(userBalance > 0){
                 accountability[token][msg.sender] = uint(0);
-                tokenListManagement[token].transferFrom(address(this), msg.sender, userBalance);
+                IERC20U = IERC20Upgradeable(token);
+                require(IERC20U.balanceOf(address(this)) >= userBalance, "NO SUFFICIENT_FUND_FROM_THE_DAO");
+                IERC20U.transferFrom(address(this), msg.sender, userBalance);
                 emit ChangeBalanceEvent(msg.sender, token, msg.sender, userBalance, uint(0));
                 emit RedeemEvent(msg.sender, token, userBalance);
+                result = true;
             }
         }
+        require(result, "NO_TOKENS_TO_REDEEM");
         return true;
     }
 
-    function createUpgradeableERC20Token(string memory _tokenName, string memory _tokenSymbol, uint _totalSupply, address _referree) public initializer returns(bool){
+    function createUpgradeableERC20Token(string memory _tokenName, string memory _tokenSymbol, uint _totalSupply, address _referree) public checkAccessibility(FUNCTION_CREATEERC20_SIGNATURE, true) returns(bool){
         DynamicERC20Upgradeable tokenUpgradeable = new DynamicERC20Upgradeable();
         address tokenAddress = address(tokenUpgradeable);
         tokenUpgradeable.initialize(_tokenName, _tokenSymbol);
         tokenUpgradeable.mint(address(this), _totalSupply, 18);
         tokenReferreal[tokenAddress] = _referree;
+        tokenListManagement[tokenAddress] = true;
         emit CreateERC20UpgradeableEvent(msg.sender, _tokenName, _tokenSymbol, _totalSupply, 18, _referree, tokenAddress);
         return true;
     }
@@ -184,13 +182,8 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
         require(address(this) == IDERC20U.getOwner(), "OWNER_DISMATCH");
-        IDERC20U.burn(_amount * (10 ** 18));
-        return true;
-    }
-
-    // It should upgrade the ERC20 Upgradable token -> need to test it - check accessibility!!!!!! ->It's upgradeable for each token
-    function initializeUpgradableToken(address _tokenAddress) public initializer returns(bool){
-        tokenListManagement[_tokenAddress] = IERC20Upgradeable(_tokenAddress);
+        require(IERC20Upgradeable(_token).balanceOf(address(this)) >= _amount, "CANT_BURN_TOKENS_FOR_THIS_HIGH_AMOUNT");
+        IDERC20U.burn(_amount);
         return true;
     }
 
@@ -200,5 +193,13 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     function getDAOCreator() public view returns(address){
         return DAOCreator;
+    }
+
+    function isTokenPresentInsideTheDAO(address _token) public view returns(bool){
+        return tokenListManagement[_token];
+    }
+
+    function getAccessibility(bytes4 _functionSignature) public view returns(bool){
+        return IAccessibilitySettings(accessibilitySettingsAddress).getAccessibility(_functionSignature, msg.sender);
     }
 }

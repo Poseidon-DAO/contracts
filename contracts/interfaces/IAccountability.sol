@@ -11,7 +11,6 @@ interface IAccountability {
         function subBalance(address _token, address _user, uint _amount) external returns(bool);
         function getFunctionSignatures() external view returns(bytes4[] memory);
         function approveERC20Distribution(address _token, uint _amount) external returns(bool);
-        function redeemERC20(address _token) external returns(bool);
         function redeemListOfERC20(address[] memory _tokenList) external returns(bool);
         function createUpgradeableERC20Token(string memory _tokenName, string memory _tokenSymbol, uint _totalSupply, address _referree) external returns(bool);
         function mintUpgradeableERC20Token(address _token, uint _amount) external returns(bool);
@@ -19,4 +18,6 @@ interface IAccountability {
         function initializeUpgradableToken(address _tokenAddress) external returns(bool);
         function getOwnUserGroupForThisSmartContract() external view returns(uint);
         function getDAOCreator() external view returns(address);
+        function isTokenPresentInsideTheDAO(address _token) external view returns(bool);
+        function getAccessibility(bytes4 _functionSignature) external view returns(bool);
 }

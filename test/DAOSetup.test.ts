@@ -14,13 +14,13 @@ async function setupDAODeploy() {
 }
 
 async function accessibilitySettingsDeploy(owner) {
-  const AccesibilitySettingsContractFactory = await ethers.getContractFactory("AccessibilitySettings");
-  return await AccesibilitySettingsContractFactory.deploy(owner);
+  const AccessibilitySettingsContractFactory = await ethers.getContractFactory("AccessibilitySettings");
+  return await AccessibilitySettingsContractFactory.deploy(owner);
 }
 
 async function accountabilityDeploy(accessibilitySettingsAddress, owner) {
-  const AccesibilitySettingsContractFactory = await ethers.getContractFactory("Accountability");
-  return await AccesibilitySettingsContractFactory.deploy(accessibilitySettingsAddress, owner);
+  const AccessibilitySettingsContractFactory = await ethers.getContractFactory("Accountability");
+  return await AccessibilitySettingsContractFactory.deploy(accessibilitySettingsAddress, owner);
 }
 
 describe("Unit Test: DAO Setup", function () {
@@ -102,7 +102,7 @@ describe("Integrate Test: SetupDAO - Accessibility Settings", function () {
 
 });
 
-describe("Unit Test: Can't Deploy Accessibility Settings if DAO Creator is set to NULL", function () {
+describe("Unit Test: Deploy Accessibility Settings", function () {
 
   it("Can't Deploy for accessibilitySettings NULL Address", async function () {
     await expect(accessibilitySettingsDeploy(ZERO_ADDRESS)).to.be.revertedWith("CANT_SET_NULL_ADDRESS");
@@ -249,7 +249,7 @@ describe("Unit Test: Accessibility Settings", function () {
   });
 
 
-  it("Accessibility is false for uknown msg.sender", async function () {
+  it("Accessibility is false for unknown msg.sender", async function () {
     const groupIndexList = [2, 3];
     const userList = [add2.address, add3.address];
     const sampleSignature = BYTES4DATA[0];
@@ -340,8 +340,8 @@ describe("Unit Test: Accountability", function () {
 
   it("Check if after deploy the smart contract itself is in Admin User Group", async function () {
     expect(await accessibilitySettings.connect(accountability.address).getUserGroup(accountability.address)).to.equal(1);
-
   });
+
   it("Check if after deploy accessibilitySettings has enabled signatures for admin group", async function () {
     const signatures = await accountability.getFunctionSignatures();
     expect(await accessibilitySettings.connect(accountability.address).getAccessibility(signatures[0], owner.address)).to.equals(true);
@@ -352,7 +352,329 @@ describe("Unit Test: Accountability", function () {
     expect(await accessibilitySettings.connect(accountability.address).getAccessibility(signatures[1], accountability.address)).to.equals(true);
     expect(await accessibilitySettings.connect(accountability.address).getAccessibility(signatures[2], accountability.address)).to.equals(true);
     expect(await accessibilitySettings.connect(accountability.address).getAccessibility(signatures[3], accountability.address)).to.equals(true);
-    expect(await accessibilitySettings.connect(accountability.address).getUserGroup(owner.address)).to.equals(1);
-    expect(await accessibilitySettings.connect(accountability.address).getUserGroup(accountability.address)).to.equals(1);
   });
+
+  it("Change Accessibility Settings if caller is DAO Creator", async function () {
+    await accountability.connect(owner).changeAccessibilitySettings(add1.address);
+    const events = await accountability.queryFilter(accountability.filters.ChangeAccessibilitySettingsAddressEvent());
+    expect(events[0].args.owner).to.equal(owner.address);
+    expect(events[0].args.accessibilitySettingsAddress).to.equal(add1.address);
+  });
+
+  it("Can't change Accessibility Settings if DAO Creator for NULL address", async function () {
+    await expect(accountability.connect(owner).changeAccessibilitySettings(ZERO_ADDRESS)).to.be.revertedWith("CANT_SET_TO_NULL_ADDRESS");
+  });
+
+  it("Can't change Accessibility Settings if caller is not DAO Creator", async function () {
+    await expect(accountability.connect(add1).changeAccessibilitySettings(add2.address)).to.be.revertedWith("ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
+  });
+
+  it("Can Disable Signatures if DAO Creator", async function () {
+    const signatures = await accountability.getFunctionSignatures()
+    const signaturesToDisable = [signatures[0], signatures[1]];
+    const adminGroup = [1];
+    // Check if are enabled yet
+    expect(await accountability.connect(owner).getAccessibility(signatures[0])).to.equal(true);
+    expect(await accountability.connect(owner).getAccessibility(signatures[1])).to.equal(true);
+    await accountability.connect(owner).disableListOfSignaturesForGroupUser(signaturesToDisable, adminGroup);
+    expect(await accountability.connect(owner).getAccessibility(signatures[0])).to.equal(false);
+    expect(await accountability.connect(owner).getAccessibility(signatures[1])).to.equal(false);
+   });
+
+  it("Can't Disable Signatures for strangers", async function () {
+    const signatures = await accountability.getFunctionSignatures()
+    const signaturesToDisable = [signatures[0], signatures[1]];
+    const adminGroup = [1];
+    // Check if are enabled yet
+    expect(await accountability.connect(owner).getAccessibility(signatures[0])).to.equal(true);
+    expect(await accountability.connect(owner).getAccessibility(signatures[1])).to.equal(true);
+    await expect(accountability.connect(add1).disableListOfSignaturesForGroupUser(signaturesToDisable, adminGroup)).to.be.revertedWith("ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
+ 
+  });
+
+  it("Can Enable Signatures if DAO Creator", async function () {
+    const signaturesToEnable = BYTES4DATA;
+    const adminGroup = [1];
+    // Check if are enabled yet
+    expect(await accountability.connect(owner).getAccessibility(signaturesToEnable[0])).to.equal(false);
+    expect(await accountability.connect(owner).getAccessibility(signaturesToEnable[1])).to.equal(false);
+    await accountability.connect(owner).enableListOfSignaturesForGroupUser(signaturesToEnable, adminGroup);
+    expect(await accountability.connect(owner).getAccessibility(signaturesToEnable[0])).to.equal(true);
+    expect(await accountability.connect(owner).getAccessibility(signaturesToEnable[1])).to.equal(true);
+  });
+
+  it("Can't Enable Signatures if strangers", async function () {
+    const signaturesToEnable = BYTES4DATA;
+    const adminGroup = [1];
+    // Check if are enabled yet
+    expect(await accountability.connect(owner).getAccessibility(signaturesToEnable[0])).to.equal(false);
+    expect(await accountability.connect(owner).getAccessibility(signaturesToEnable[1])).to.equal(false);
+    await expect(accountability.connect(add1).enableListOfSignaturesForGroupUser(signaturesToEnable, adminGroup)).to.be.revertedWith("ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
+  });
+
+  it("Can Add Balance with accessibility", async function () {
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", tenThousoundsWithDecimals, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await accountability.connect(owner).addBalance(tokenAddress, add1.address, tenThousoundsWithDecimals);
+    const changeBalanceEvents = await accountability.queryFilter(accountability.filters.ChangeBalanceEvent());
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.caller).to.equals(owner.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.token).to.equals(tokenAddress);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.user).to.equals(add1.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.oldBalance).to.equals(ethers.BigNumber.from("0"));
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.newBalance).to.equals(tenThousoundsWithDecimals);
+    expect(await accountability.connect(owner).getBalance(tokenAddress, add1.address)).to.equals(tenThousoundsWithDecimals);
+  });
+
+  it("Can't Add Balance without accessibility", async function () {
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", tenThousoundsWithDecimals, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await expect(accountability.connect(add1).addBalance(tokenAddress, add1.address, tenThousoundsWithDecimals)).to.be.revertedWith("FUNCTION_NOT_ALLOWED_TO_RUN_FROM_THIS_SMARTCONTRACT");
+  });
+
+  it("Sub Balance with accessibility", async function () {
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    const fiveThousoundsWithDecimals = ethers.BigNumber.from("5000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", tenThousoundsWithDecimals, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await accountability.connect(owner).addBalance(tokenAddress, add1.address, tenThousoundsWithDecimals);
+    await accountability.connect(owner).subBalance(tokenAddress, add1.address, fiveThousoundsWithDecimals);
+    const changeBalanceEvents = await accountability.queryFilter(accountability.filters.ChangeBalanceEvent());
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.caller).to.equals(owner.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.token).to.equals(tokenAddress);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.user).to.equals(add1.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.oldBalance).to.equals(tenThousoundsWithDecimals);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.newBalance).to.equals(tenThousoundsWithDecimals.sub(fiveThousoundsWithDecimals));
+    expect(await accountability.connect(owner).getBalance(tokenAddress, add1.address)).to.equals(tenThousoundsWithDecimals.sub(fiveThousoundsWithDecimals));
+  });
+
+  it("Can't Sub Balance without accessibility", async function () {
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    const fiveThousoundsWithDecimals = ethers.BigNumber.from("5000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", tenThousoundsWithDecimals, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await accountability.connect(owner).addBalance(tokenAddress, add1.address, tenThousoundsWithDecimals);
+    await expect(accountability.connect(add1).subBalance(tokenAddress, add1.address, fiveThousoundsWithDecimals)).to.be.revertedWith("FUNCTION_NOT_ALLOWED_TO_RUN_FROM_THIS_SMARTCONTRACT");
+  });
+
+  it("Set User List Role with accessibility", async function () {
+    const userGroupList = [2, 3];
+    const userList = [add1.address, add2.address];
+    await expect(accountability.connect(add1).setUserListRole(userList, userGroupList)).to.be.revertedWith("FUNCTION_NOT_ALLOWED_TO_RUN_FROM_THIS_SMARTCONTRACT");
+  });
+
+  it("Can't Set User List Role without accessibility", async function () {
+    const userGroupList = [2, 3];
+    const userList = [add1.address, add2.address];
+    await accountability.connect(owner).setUserListRole(userList, userGroupList);
+  });
+
+  it("Create ERC20 Token with accessibility", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const billionWithDecimals = ethers.BigNumber.from("1000000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    const IERC20Upgradeable = await ethers.getContractAt("IERC20Upgradeable", tokenAddress);
+    expect(await IERC20Upgradeable.balanceOf(accountability.address)).to.equals(billionWithDecimals);
+  });
+
+  it("Check if the new token is inside the DAO", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    expect(await accountability.isTokenPresentInsideTheDAO(tokenAddress)).to.equals(true);
+  });
+
+
+  it("Check if the a token not registered is not inside the DAO", async function () {
+    expect(await accountability.isTokenPresentInsideTheDAO(ZERO_ADDRESS)).to.equals(false);
+  });
+
+  it("Can't Create ERC20 Token without accessibility", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const billionWithDecimals = ethers.BigNumber.from("1000000000000000000000000000");
+    await expect(accountability.connect(add1).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add2.address)).to.be.revertedWith("FUNCTION_NOT_ALLOWED_TO_RUN_FROM_THIS_SMARTCONTRACT");
+  });
+
+  it("Can Mint ERC20 Token with correct referee and data", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const billionWithDecimals = ethers.BigNumber.from("1000000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await accountability.connect(add1).mintUpgradeableERC20Token(tokenAddress, billion);
+    const IERC20Upgradeable = await ethers.getContractAt("IERC20Upgradeable", tokenAddress);
+    expect(await IERC20Upgradeable.balanceOf(accountability.address)).to.equals(billionWithDecimals.add(billionWithDecimals));
+    const IDynamicERC20Upgradeable = await ethers.getContractAt("IDynamicERC20Upgradeable", tokenAddress);
+    expect(await IDynamicERC20Upgradeable.connect(accountability.address).getOwner()).to.equals(accountability.address);
+  });
+
+  it("Can't mint ERC20 Token with wrong referee", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await expect(accountability.connect(add2).mintUpgradeableERC20Token(tokenAddress, billion)).to.be.revertedWith("REFEREE_DISMATCH");
+  });
+
+  it("Can't mint ERC20 Token with 0 amount", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await expect(accountability.connect(add1).mintUpgradeableERC20Token(tokenAddress, ethers.BigNumber.from("0"))).to.be.revertedWith("INSUFFICIENT_AMOUNT");
+  });
+
+  it("Can't mint or burn ERC20 Token if the token itself is not created from the smart contract itself", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    const IDynamicERC20Upgradeable = await ethers.getContractAt("IDynamicERC20Upgradeable", tokenAddress);
+    expect(await IDynamicERC20Upgradeable.connect(add1).getOwner()).to.equal(accountability.address);
+  });
+
+  it("Can burn ERC20 token with correct referee and data", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const billionWithDecimals = ethers.BigNumber.from("1000000000000000000000000000");
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await accountability.connect(add1).burnUpgradeableERC20Token(tokenAddress, tenThousoundsWithDecimals);
+    const IERC20Upgradeable = await ethers.getContractAt("IERC20Upgradeable", tokenAddress);
+    expect(await IERC20Upgradeable.balanceOf(accountability.address)).to.equals(billionWithDecimals.sub(tenThousoundsWithDecimals));
+  });
+
+  it("Can't burn ERC20 token with wrong referee", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await expect(accountability.connect(add2).burnUpgradeableERC20Token(tokenAddress, tenThousoundsWithDecimals)).to.be.revertedWith("REFEREE_DISMATCH");
+  });
+
+  it("Can't burn ERC20 token with 0 amount", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await expect(accountability.connect(add1).burnUpgradeableERC20Token(tokenAddress, ethers.BigNumber.from("0"))).to.be.revertedWith("INSUFFICIENT_AMOUNT");
+  });
+
+  it("Can burn ERC20 Token if the amount is greater than the token balance of the contract itself", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const billionWithDecimalsPlus1 = ethers.BigNumber.from("1000000000000000000000000001");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await expect(accountability.connect(add1).burnUpgradeableERC20Token(tokenAddress, billionWithDecimalsPlus1)).to.be.revertedWith("CANT_BURN_TOKENS_FOR_THIS_HIGH_AMOUNT");
+  });
+
+  it("Can approve ERC20 Token with the correct referee and data", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await accountability.connect(add1).approveERC20Distribution(tokenAddress, tenThousoundsWithDecimals);
+    const IERC20Upgradeable = await ethers.getContractAt("IERC20Upgradeable", tokenAddress);
+    expect(await IERC20Upgradeable.allowance(accountability.address, accountability.address)).to.equals(tenThousoundsWithDecimals);
+  });
+
+  it("Can't approve ERC20 Token if referee dismatch", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const billionWithDecimals = ethers.BigNumber.from("1000000000000000000000000000");
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await expect(accountability.connect(add2).approveERC20Distribution(tokenAddress, tenThousoundsWithDecimals)).to.be.revertedWith("REFEREE_DISMATCH");
+  });
+
+  it("Can't approve ERC20 Token if token is NULL", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    await expect(accountability.connect(add1).approveERC20Distribution(ZERO_ADDRESS, tenThousoundsWithDecimals)).to.be.revertedWith("CANT_REFER_TO_NULL_ADDRESS");
+  });
+
+  it("Can't approve ERC20 Token if amount is 0", async function () {
+    const billion = ethers.BigNumber.from("1000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME", "TOKEN_SYM", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress = events[events.length-1].args.tokenUpgradeableAddress;
+    await expect(accountability.connect(add1).approveERC20Distribution(tokenAddress, ethers.BigNumber.from("0"))).to.be.revertedWith("CANT_APPROVE_NULL_AMOUNT");
+  });
+
+  it("Redeem list of ERC20", async function () {
+    // CREATE TOKENS
+    const billion = ethers.BigNumber.from("1000000000");
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME1", "TOKEN_SYM1", billion, add1.address);
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME2", "TOKEN_SYM2", billion, add1.address);
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME2", "TOKEN_SYM3", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress1 =  events[events.length-3].args.tokenUpgradeableAddress;
+    const tokenAddress2 =  events[events.length-2].args.tokenUpgradeableAddress;
+    const tokenAddress3 =  events[events.length-1].args.tokenUpgradeableAddress;
+    const tokenList = [tokenAddress1, tokenAddress2,  tokenAddress3];
+    // ADD LOCAL BALANCE TO AN ADDRESS
+    await accountability.connect(owner).addBalance(tokenAddress1, add1.address, tenThousoundsWithDecimals);
+    await accountability.connect(owner).addBalance(tokenAddress2, add1.address, tenThousoundsWithDecimals);
+    await accountability.connect(owner).addBalance(tokenAddress3, add1.address, tenThousoundsWithDecimals);
+    // CHECK BALANCES OF TOKEN LIST
+    expect(await accountability.getBalance(tokenAddress1, add1.address)).to.equals(tenThousoundsWithDecimals);
+    expect(await accountability.getBalance(tokenAddress2, add1.address)).to.equals(tenThousoundsWithDecimals);
+    expect(await accountability.getBalance(tokenAddress3, add1.address)).to.equals(tenThousoundsWithDecimals);
+    // INCREASE ALLOWANCE
+    await accountability.connect(add1).approveERC20Distribution(tokenAddress1, tenThousoundsWithDecimals);
+    await accountability.connect(add1).approveERC20Distribution(tokenAddress2, tenThousoundsWithDecimals);
+    await accountability.connect(add1).approveERC20Distribution(tokenAddress3, tenThousoundsWithDecimals);
+    // REDEEM LIST OF TOKENS
+    await accountability.connect(add1).redeemListOfERC20(tokenList);
+    // CHECK EVENTS
+    const changeBalanceEvents = await accountability.queryFilter(accountability.filters.ChangeBalanceEvent());
+    expect(changeBalanceEvents[changeBalanceEvents.length - 3].args.caller).to.equals(add1.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 3].args.token).to.equals(tokenAddress1);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 3].args.user).to.equals(add1.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 3].args.oldBalance).to.equals(tenThousoundsWithDecimals);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 3].args.newBalance).to.equals(ethers.BigNumber.from("0"));
+    expect(changeBalanceEvents[changeBalanceEvents.length - 2].args.caller).to.equals(add1.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 2].args.token).to.equals(tokenAddress2);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 2].args.user).to.equals(add1.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 2].args.oldBalance).to.equals(tenThousoundsWithDecimals);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 2].args.newBalance).to.equals(ethers.BigNumber.from("0"));
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.caller).to.equals(add1.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.token).to.equals(tokenAddress3);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.user).to.equals(add1.address);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.oldBalance).to.equals(tenThousoundsWithDecimals);
+    expect(changeBalanceEvents[changeBalanceEvents.length - 1].args.newBalance).to.equals(ethers.BigNumber.from("0"));
+    const redeemEvents = await accountability.queryFilter(accountability.filters.RedeemEvent());
+    expect(redeemEvents[redeemEvents.length - 3].args.caller).to.equals(add1.address);
+    expect(redeemEvents[redeemEvents.length - 3].args.token).to.equals(tokenAddress1);
+    expect(redeemEvents[redeemEvents.length - 3].args.redeemAmount).to.equals(tenThousoundsWithDecimals);
+    expect(redeemEvents[redeemEvents.length - 2].args.caller).to.equals(add1.address);
+    expect(redeemEvents[redeemEvents.length - 2].args.token).to.equals(tokenAddress2);
+    expect(redeemEvents[redeemEvents.length - 2].args.redeemAmount).to.equals(tenThousoundsWithDecimals);    
+    expect(redeemEvents[redeemEvents.length - 1].args.caller).to.equals(add1.address);
+    expect(redeemEvents[redeemEvents.length - 1].args.token).to.equals(tokenAddress3);
+    expect(redeemEvents[redeemEvents.length - 1].args.redeemAmount).to.equals(tenThousoundsWithDecimals);
+    // CHECK EACH TOKEN BALANCE FOR ADDRESS
+    const IERC20Upgradeable1 = await ethers.getContractAt("IERC20Upgradeable", tokenAddress1);
+    const IERC20Upgradeable2 = await ethers.getContractAt("IERC20Upgradeable", tokenAddress2);
+    const IERC20Upgradeable3 = await ethers.getContractAt("IERC20Upgradeable", tokenAddress3);
+    expect(await IERC20Upgradeable1.balanceOf(add1.address)).to.equals(tenThousoundsWithDecimals);
+    expect(await IERC20Upgradeable2.balanceOf(add1.address)).to.equals(tenThousoundsWithDecimals);
+    expect(await IERC20Upgradeable3.balanceOf(add1.address)).to.equals(tenThousoundsWithDecimals);
+  });
+
 });

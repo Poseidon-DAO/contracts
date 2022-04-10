@@ -16,28 +16,53 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
  
     using SafeMathUpgradeable for uint256;
 
+    uint N_BLOCK_DAY = 5760;
+
     address DAOCreator;
     address accessibilitySettingsAddress;
 
     bytes4[] functionSignatures;
 
     mapping(address => mapping(address => uint)) accountability; // TOKEN -> ADDRESS -> BALANCE
-    mapping(address => bool) tokenListManagement; // TOKEN => ISPRESENT
     mapping(address => address) tokenReferreal; //TOKEN => ADDRESS (user reference that is "owner" of the token)
+    mapping(address => tokenManagementMetaData) tokenManagement;
 
     event ChangeAccessibilitySettingsAddressEvent(address owner, address accessibilitySettingsAddress);
     event ChangeBalanceEvent(address indexed caller, address indexed token, address indexed user, uint oldBalance, uint newBalance);
     event ApproveDistributionEvent(address indexed referee, address indexed token, uint amount);
     event RedeemEvent(address indexed caller, address indexed token, uint redeemAmount);
     event CreateERC20UpgradeableEvent(address caller, string tokenName, string tokenSymbol, uint totalSupply, uint8 decimals, address referee, address tokenUpgradeableAddress);
+    event SecurityTokenMovements(address indexed caller, address token, uint opID, uint blockNumber, uint amount);
 
-    modifier onlyOwner(){
+    struct tokenManagementMetaData {
+        address tokenReferreal;
+        uint lastBlockChange;
+        mapping(address => uint) lastBlockUserOp;
+    }
+
+    enum opID {
+        NONE,
+        CREATE,
+        BURN,
+        MINT,
+        APPROVE,
+        REDEEM
+    }
+
+    modifier onlyDAOCreator(){
         require(DAOCreator == msg.sender, "ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
         _;
     }
 
     modifier checkAccessibility(bytes4 _signature, bool _expectedValue){
         require(IAccessibilitySettings(accessibilitySettingsAddress).getAccessibility(_signature, msg.sender) == _expectedValue, "FUNCTION_NOT_ALLOWED_TO_RUN_FROM_THIS_SMARTCONTRACT");
+        _;
+    }
+
+    modifier temporaryLockSecurity(address _token){
+        if(DAOCreator != msg.sender){
+            require(getBlocksRemained(_token) > 0, "THIS_FUNCTION_IS_TEMPORARY_LOCKED_FOR_SECURITY");
+        }
         _;
     }
 
@@ -71,19 +96,19 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     // ONLY OWNER FUNCTIONS 
 
-    function changeAccessibilitySettings(address _accessibilitySettingsAddress) public onlyOwner returns(bool){
+    function changeAccessibilitySettings(address _accessibilitySettingsAddress) public onlyDAOCreator returns(bool){
         require(_accessibilitySettingsAddress != address(0), "CANT_SET_TO_NULL_ADDRESS");
         accessibilitySettingsAddress = _accessibilitySettingsAddress;
         emit ChangeAccessibilitySettingsAddressEvent(msg.sender, _accessibilitySettingsAddress);
         return true;
     }
 
-    function enableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyOwner returns(bool){
+    function enableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator returns(bool){
         IAccessibilitySettings(accessibilitySettingsAddress).enableSignature(_signatures, _userGroup);
         return true;
     }
 
-    function disableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyOwner returns(bool){
+    function disableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator returns(bool){
         IAccessibilitySettings(accessibilitySettingsAddress).disableSignature(_signatures, _userGroup);
         return true;
     }
@@ -93,6 +118,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     function addBalance(address _token, address _user, uint _amount) external checkAccessibility(FUNCTION_ADDBALANCE_SIGNATURE, true) returns(bool){
         require(_user != address(0), "CANT_ADD_BALANCE_ON_NULL_ADDRESS");
         require(_token != address(0), "TOKEN_CANT_BE_NULL_ADDRESS");
+        tokenManagement[_token].lastBlockUserOp[_user] = block.number;  // Sender can't redeem for one day this token
         uint oldbalance = accountability[_token][_user];
         uint newBalance = oldbalance.add(_amount);
         accountability[_token][_user] = newBalance;
@@ -103,6 +129,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     function subBalance(address _token, address _user, uint _amount) external checkAccessibility(FUNCTION_SUBBALANCE_SIGNATURE, true) returns(bool){
         require(_user != address(0), "CANT_ADD_BALANCE_ON_NULL_ADDRESS");
         require(_token != address(0), "TOKEN_CANT_BE_NULL_ADDRESS");
+        tokenManagement[_token].lastBlockUserOp[_user] = block.number;  // Sender can't redeem for one day this token
         uint oldbalance = accountability[_token][_user];
         uint newBalance = oldbalance.sub(_amount);
         accountability[_token][_user] = newBalance;
@@ -113,7 +140,6 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) checkAccessibility(FUNCTION_SETUSERROLE_SIGNATURE, true) public returns(bool){
         require(_userAddress.length == _userGroup.length, "DATA_LENGTH_DISMATCH");
         IAccessibilitySettings(accessibilitySettingsAddress).setUserListRole(_userAddress,_userGroup);
-        //emit on Interface
         return true;
     }
 
@@ -125,12 +151,13 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return accountability[_token][_user];
     }
 
-    // NEED TO APPROVE THIS SMART CONTRACT SUCH A SPENDER FROM THE OWNER OF THE ERC20
-    function approveERC20Distribution(address _token, uint _amount) public returns(bool){
+    function approveERC20Distribution(address _token, uint _amount) public temporaryLockSecurity(_token) returns(bool){
         require(_token != address(0), "CANT_REFER_TO_NULL_ADDRESS");
         require(_amount > 0, "CANT_APPROVE_NULL_AMOUNT");
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
-        IERC20Upgradeable(_token).approve(address(this), _amount); // load upgradeable interface
+        IERC20Upgradeable(_token).approve(address(this), _amount);
+        tokenManagement[_token].lastBlockChange = block.number;
+        emit SecurityTokenMovements(msg.sender, _token, uint(opID.APPROVE), block.number, _amount);
         return true;
     }
 
@@ -141,13 +168,16 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         result = false;
         IERC20Upgradeable IERC20U;
         for(uint index; index < _tokenList.length; index++){
+            tokenManagement[_tokenList[index]].lastBlockUserOp[msg.sender] = block.number;
             token = _tokenList[index];
             userBalance = getBalance(token, msg.sender);
-            if(userBalance > 0){
+            if(userBalance > 0 && getBlocksUserOpRemained(token, msg.sender) > 0){
+                tokenManagement[_tokenList[index]].lastBlockUserOp[msg.sender] = block.number;  // Sender can't redeem agan for one day this token
                 accountability[token][msg.sender] = uint(0);
                 IERC20U = IERC20Upgradeable(token);
                 require(IERC20U.balanceOf(address(this)) >= userBalance, "NO SUFFICIENT_FUND_FROM_THE_DAO");
                 IERC20U.transferFrom(address(this), msg.sender, userBalance);
+                emit SecurityTokenMovements(msg.sender, token, uint(opID.REDEEM), block.number, userBalance);
                 emit ChangeBalanceEvent(msg.sender, token, msg.sender, userBalance, uint(0));
                 emit RedeemEvent(msg.sender, token, userBalance);
                 result = true;
@@ -163,27 +193,34 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         tokenUpgradeable.initialize(_tokenName, _tokenSymbol);
         tokenUpgradeable.mint(address(this), _totalSupply, 18);
         tokenReferreal[tokenAddress] = _referree;
-        tokenListManagement[tokenAddress] = true;
+        tokenManagement[tokenAddress].lastBlockChange = block.number;
         emit CreateERC20UpgradeableEvent(msg.sender, _tokenName, _tokenSymbol, _totalSupply, 18, _referree, tokenAddress);
+        emit SecurityTokenMovements(msg.sender, tokenAddress, uint(opID.CREATE), block.number, _totalSupply.mul(10**18));
         return true;
     }
 
-    function mintUpgradeableERC20Token(address _token, uint _amount) public returns(bool){
+    function mintUpgradeableERC20Token(address _token, uint _amount) public temporaryLockSecurity(_token) returns(bool){
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
         require(address(this) == IDERC20U.getOwner(), "OWNER_DISMATCH");
+        tokenManagement[_token].lastBlockChange = block.number;             // Sender can't burn, mint or approve for one day
+        tokenManagement[_token].lastBlockUserOp[msg.sender] = block.number; // Sender can't redeem for one day
         IDERC20U.mint(address(this), _amount, 18);
+        emit SecurityTokenMovements(msg.sender, _token, uint(opID.MINT), block.number, _amount);
         return true;
     }
 
-    function burnUpgradeableERC20Token(address _token, uint _amount) public returns(bool){
+    function burnUpgradeableERC20Token(address _token, uint _amount) public temporaryLockSecurity(_token) returns(bool){
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
         require(address(this) == IDERC20U.getOwner(), "OWNER_DISMATCH");
         require(IERC20Upgradeable(_token).balanceOf(address(this)) >= _amount, "CANT_BURN_TOKENS_FOR_THIS_HIGH_AMOUNT");
+        tokenManagement[_token].lastBlockChange = block.number;             // Sender can't burn, mint or approve for one day
+        tokenManagement[_token].lastBlockUserOp[msg.sender] = block.number; // Sender can't redeem for one day
         IDERC20U.burn(_amount);
+        emit SecurityTokenMovements(msg.sender, _token, uint(opID.BURN), block.number, _amount);
         return true;
     }
 
@@ -196,10 +233,22 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     }
 
     function isTokenPresentInsideTheDAO(address _token) public view returns(bool){
-        return tokenListManagement[_token];
+        if(tokenManagement[_token].lastBlockChange > 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     function getAccessibility(bytes4 _functionSignature) public view returns(bool){
         return IAccessibilitySettings(accessibilitySettingsAddress).getAccessibility(_functionSignature, msg.sender);
+    }
+
+    function getBlocksRemained(address _token) public view returns(uint){
+        return N_BLOCK_DAY.sub(block.number.sub(tokenManagement[_token].lastBlockChange));
+    }
+
+    function getBlocksUserOpRemained(address _token, address _user) public view returns(uint){
+        return N_BLOCK_DAY.sub(tokenManagement[_token].lastBlockUserOp[_user]);
     }
 }

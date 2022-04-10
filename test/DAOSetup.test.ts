@@ -621,7 +621,7 @@ describe("Unit Test: Accountability", function () {
     const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
     await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME1", "TOKEN_SYM1", billion, add1.address);
     await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME2", "TOKEN_SYM2", billion, add1.address);
-    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME2", "TOKEN_SYM3", billion, add1.address);
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME3", "TOKEN_SYM3", billion, add1.address);
     const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
     const tokenAddress1 =  events[events.length-3].args.tokenUpgradeableAddress;
     const tokenAddress2 =  events[events.length-2].args.tokenUpgradeableAddress;
@@ -677,4 +677,23 @@ describe("Unit Test: Accountability", function () {
     expect(await IERC20Upgradeable3.balanceOf(add1.address)).to.equals(tenThousoundsWithDecimals);
   });
 
+  it("Revert in case all tokens to redeem have amount null", async function () {
+    // CREATE TOKENS
+    const billion = ethers.BigNumber.from("1000000000");
+    const tenThousoundsWithDecimals = ethers.BigNumber.from("10000000000000000000000000");
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME1", "TOKEN_SYM1", billion, add1.address);
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME2", "TOKEN_SYM2", billion, add1.address);
+    await accountability.connect(owner).createUpgradeableERC20Token("TOKEN_NAME2", "TOKEN_SYM3", billion, add1.address);
+    const events = await accountability.queryFilter(accountability.filters.CreateERC20UpgradeableEvent());
+    const tokenAddress1 =  events[events.length-3].args.tokenUpgradeableAddress;
+    const tokenAddress2 =  events[events.length-2].args.tokenUpgradeableAddress;
+    const tokenAddress3 =  events[events.length-1].args.tokenUpgradeableAddress;
+    const tokenList = [tokenAddress1, tokenAddress2,  tokenAddress3];
+    await accountability.connect(add1).approveERC20Distribution(tokenAddress1, tenThousoundsWithDecimals);
+    await accountability.connect(add1).approveERC20Distribution(tokenAddress2, tenThousoundsWithDecimals);
+    await accountability.connect(add1).approveERC20Distribution(tokenAddress3, tenThousoundsWithDecimals);
+    await expect(accountability.connect(add1).redeemListOfERC20(tokenList)).to.be.revertedWith("NO_TOKENS_TO_REDEEM");
+  });
+
+  // --do all negative tests for redeem
 });

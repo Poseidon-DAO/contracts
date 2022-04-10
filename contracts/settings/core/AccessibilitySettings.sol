@@ -46,6 +46,7 @@ contract AccessibilitySettings{
         require(_functionSignatureList.length > 0, "NO_SIGNATURES_DEFINED");
         for(uint signIndex = 0; signIndex < _functionSignatureList.length; signIndex++){
             for(uint index = 0; index < _userGroupList.length; index++){
+                require(_userGroupList[index] != uint(1), "CANNOT_DISABLE_ADMIN_FUNCTIONS");
                 Accessibility[msg.sender][_functionSignatureList[signIndex]][_userGroupList[index]] = false;
                 emit ChangeGroupAccessibilityEvent(msg.sender, _functionSignatureList[signIndex], _userGroupList[index], false);
             }
@@ -53,17 +54,11 @@ contract AccessibilitySettings{
         return true;
     }
 
-    function setUserRole(address _userAddress, uint _userGroup) public returns(bool){
-        require(_userAddress != address(0), "CANT_SET_NULL_ADDRESS");
-        AccessibilityGroup[msg.sender][_userAddress] = _userGroup;
-        emit ChangeUserGroupEvent(msg.sender, _userAddress, _userGroup);
-        return true;
-    }
-
     function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) public returns(bool){
         require(_userAddress.length == _userGroup.length, "DATA_LENGTH_DISMATCH");
         for(uint index = 0; index < _userAddress.length; index++){
             require(_userAddress[index] != address(0), "CANT_SET_NULL_ADDRESS");
+            require(DAOCreator != _userAddress[index], "CANNOT_CHANGE_USER_ROLE_TO_DAO_CREATOR");
             AccessibilityGroup[msg.sender][_userAddress[index]] = _userGroup[index];
             emit ChangeUserGroupEvent(msg.sender, _userAddress[index], _userGroup[index]);
         }

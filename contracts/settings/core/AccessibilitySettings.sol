@@ -9,6 +9,9 @@ contract AccessibilitySettings{
 
     using SafeMathUpgradeable for uint256;
 
+    uint N_BLOCK_DAY = uint(5760);
+    uint N_BLOCK_WEEK = uint(7).mul(N_BLOCK_DAY);
+
     mapping(address => mapping(bytes4 => mapping(uint => bool))) Accessibility; //SMART CONTRACT => SIGNATURE => USER GROUP => ACCESSIBILITY
     mapping(address => mapping(address => uint)) AccessibilityGroup; // SMART CONTRACT => USER => USER GROUP
 
@@ -18,15 +21,128 @@ contract AccessibilitySettings{
     event ChangeGroupAccessibilityEvent(address indexed smartContractReference, bytes4 indexed functionSignature, uint groupReference, bool Accessibility);
 
     address DAOCreator;
-    
-    constructor (address _DAOCreator){
+    address DAOSetup;
+    mapping(address => bool) multiSig;
+    uint multiSigLength;
+    mapping(uint => multiSigPollStruct) multiSigPoll;
+
+    uint indexPoll;
+
+    struct multiSigPollStruct {
+        uint pollType;
+        mapping(address => bool) hasVoted;
+        mapping(address => uint) voteReceived;
+        uint pollBlockStart;
+    }
+
+    enum pollTypeMetaData{
+        NULL,
+        CHANGE_CREATOR,
+        DELETE_ADDRESS_ON_MULTISIG_LIST,
+        ADD_ADDRESS_ON_MULTISIG_LIST
+    }
+
+    constructor (address _DAOCreator, address[] memory _multiSigAddresses){
+        indexPoll = 0;
         require(_DAOCreator != address(0), "CANT_SET_NULL_ADDRESS");
-        DAOCreator = _DAOCreator;         
+        bool DAOCreatorIsInMultiSig = false;
+        require(_multiSigAddresses.length >= 5, "MULTISIG_NEEDS_MIN_5_ADDRESSES");
+        for(uint index = 0; index < _multiSigAddresses.length; index++){
+            require(_multiSigAddresses[index] != address(0), "CANT_SET_NULL_ADDRESS");
+            multiSig[_multiSigAddresses[index]] = true;
+            if(_multiSigAddresses[index] == _DAOCreator){
+                DAOCreatorIsInMultiSig = true;
+            }
+        }
+        require(DAOCreatorIsInMultiSig,"DAO_CREATOR_IS_NOT_IN_MULTISIG_LIST");
+        DAOCreator = _DAOCreator;    
+        DAOSetup = msg.sender;    
     }
 
     modifier isSuperAdmin(){
         require(DAOCreator == msg.sender, "ONLY_SUPERADMIN_CAN_RUN_THIS");
         _;
+    }
+
+    function changeDAOCreator(address _voteFor, uint _pollIndex) public returns(bool){
+        require(multiSig[msg.sender], "NOT_ABLE_TO_VOTE");
+        uint refPollIndex;
+        bool hasVoted;
+        bool isChanged = false;
+        if(_pollIndex == 0){
+            refPollIndex = indexPoll.add(1);
+            indexPoll = refPollIndex;
+            multiSigPoll[refPollIndex].pollType = uint(pollTypeMetaData.CHANGE_CREATOR);
+            multiSigPoll[refPollIndex].voteReceived[_voteFor] = uint(1);
+            multiSigPoll[refPollIndex].pollBlockStart = block.number;
+        } else {
+            refPollIndex = refPollIndex;
+            require((block.number).sub(multiSigPoll[refPollIndex].pollBlockStart) <= N_BLOCK_WEEK, "MULTISIG_POLL_EXPIRED");
+            hasVoted = multiSigPoll[refPollIndex].hasVoted[msg.sender];
+            require(!hasVoted, "ADDRESS_HAS_ALREADY_VOTED");
+            uint voteFor = multiSigPoll[refPollIndex].voteReceived[_voteFor];
+            multiSigPoll[refPollIndex].voteReceived[_voteFor] = voteFor.add(1);
+            if(voteFor > multiSigLength.div(2)){ // 3/5, 5/9 or whatever
+                DAOCreator = _voteFor;
+                isChanged = true;
+            }
+        }
+        return isChanged;
+    }
+
+    function removeAddressFromMultiSig(address _voteFor, uint _pollIndex) public returns(bool){
+        require(multiSig[msg.sender], "NOT_ABLE_TO_VOTE");
+        uint refPollIndex;
+        bool hasVoted;
+        bool isChanged = false;
+        if(_pollIndex == 0){
+            require(multiSigLength > uint(5), "MINIMUM_FIVE_MULTISIG_ADDRESS");
+            refPollIndex = indexPoll.add(1);
+            indexPoll = refPollIndex;
+            multiSigPoll[refPollIndex].pollType = uint(pollTypeMetaData.CHANGE_CREATOR);
+            multiSigPoll[refPollIndex].voteReceived[_voteFor] = uint(1);
+            multiSigPoll[refPollIndex].pollBlockStart = block.number;
+        } else {
+            refPollIndex = refPollIndex;
+            require((block.number).sub(multiSigPoll[refPollIndex].pollBlockStart) <= N_BLOCK_WEEK, "MULTISIG_POLL_EXPIRED");
+            hasVoted = multiSigPoll[refPollIndex].hasVoted[msg.sender];
+            require(!hasVoted, "ADDRESS_HAS_ALREADY_VOTED");
+            uint voteFor = multiSigPoll[refPollIndex].voteReceived[_voteFor];
+            multiSigPoll[refPollIndex].voteReceived[_voteFor] = voteFor.add(1);
+            if(voteFor > multiSigLength.div(2)){ // 3/5, 5/9 or whatever
+                multiSigLength = multiSigLength.sub(1);
+                multiSig[_voteFor] = false;
+                isChanged = true;
+            }
+        }
+        return isChanged;
+    }
+
+    function addAddressFromMultiSig(address _voteFor, uint _pollIndex) public returns(bool){
+        require(multiSig[msg.sender], "NOT_ABLE_TO_VOTE");
+        uint refPollIndex;
+        bool hasVoted;
+        bool isChanged = false;
+        if(_pollIndex == 0){
+            refPollIndex = indexPoll.add(1);
+            indexPoll = refPollIndex;
+            multiSigPoll[refPollIndex].pollType = uint(pollTypeMetaData.CHANGE_CREATOR);
+            multiSigPoll[refPollIndex].voteReceived[_voteFor] = uint(1);
+            multiSigPoll[refPollIndex].pollBlockStart = block.number;
+        } else {
+            refPollIndex = refPollIndex;
+            require((block.number).sub(multiSigPoll[refPollIndex].pollBlockStart) <= N_BLOCK_WEEK, "MULTISIG_POLL_EXPIRED");
+            hasVoted = multiSigPoll[refPollIndex].hasVoted[msg.sender];
+            require(!hasVoted, "ADDRESS_HAS_ALREADY_VOTED");
+            uint voteFor = multiSigPoll[refPollIndex].voteReceived[_voteFor];
+            multiSigPoll[refPollIndex].voteReceived[_voteFor] = voteFor.add(1);
+            if(voteFor > multiSigLength.div(2)){ // 3/5, 5/9 or whatever
+                multiSigLength = multiSigLength.add(1);
+                multiSig[_voteFor] = true;
+                isChanged = true;
+            }
+        }
+        return isChanged;
     }
 
     function enableSignature(bytes4[] memory _functionSignatureList, uint[] memory _userGroupList) public returns(bool){

@@ -25,6 +25,7 @@ contract AccessibilitySettings{
 
     address DAOCreator;
     address DAOSetup;
+
     mapping(address => bool) multiSig;
     uint multiSigLength;
     mapping(uint => multiSigPollStruct) multiSigPoll;
@@ -67,30 +68,30 @@ contract AccessibilitySettings{
         _;
     }
 
-    function createMultiSigPoll(uint _pollTypeID) public returns(bool){
+    function createMultiSigPoll(uint _pollTypeID) public returns(uint){
         require(multiSig[msg.sender], "NOT_ABLE_TO_CREATE_A_MULTISIG_POLL");
         uint refPollIndex = indexPoll.add(1);
         indexPoll = refPollIndex;
         multiSigPoll[refPollIndex].pollType = _pollTypeID;
         multiSigPoll[refPollIndex].pollBlockStart = block.number;
         emit NewMultisigPollEvent(msg.sender, refPollIndex, _pollTypeID);
-        return true;
+        return refPollIndex;
     }
 
 
-    function voteMultiSigPoll(uint _pollIndex, address _voteFor) public returns(bool){
+    function voteMultiSigPoll(uint _pollIndex, address _voteForAddress) public returns(bool){
         require(multiSig[msg.sender], "NOT_ABLE_TO_CREATE_A_MULTISIG_POLL");
         uint refPollIndex = indexPoll;
         require((block.number).sub(multiSigPoll[refPollIndex].pollBlockStart) <= N_BLOCK_WEEK, "MULTISIG_POLL_EXPIRED");
         bool hasVoted = multiSigPoll[refPollIndex].hasVoted[msg.sender];
         require(!hasVoted, "ADDRESS_HAS_ALREADY_VOTED");
-        uint voteFor = multiSigPoll[refPollIndex].voteReceived[_voteFor];
-        multiSigPoll[refPollIndex].voteReceived[_voteFor] = voteFor.add(1);
-        if(voteFor > multiSigLength.div(2)){ // 3/5, 5/9 or whatever
-            runMultiSigFunction(_pollIndex, _voteFor);
-            emit ChangeStatementMultisigPollEvent(_voteFor, multiSigPoll[refPollIndex].pollType);
+        uint voteForCount = multiSigPoll[refPollIndex].voteReceived[_voteForAddress];
+        multiSigPoll[refPollIndex].voteReceived[_voteForAddress] = voteForCount.add(1);
+        if(voteForCount > multiSigLength.div(2)){ // 3/5, 5/9 or whatever
+            runMultiSigFunction(_pollIndex, _voteForAddress);
+            emit ChangeStatementMultisigPollEvent(_voteForAddress, multiSigPoll[refPollIndex].pollType);
         }
-        emit VoteMultisigPollEvent(msg.sender, _pollIndex, _voteFor);
+        emit VoteMultisigPollEvent(msg.sender, _pollIndex, _voteForAddress);
         return true;
     }
 
@@ -110,6 +111,7 @@ contract AccessibilitySettings{
         }
         return true;
     }
+    
     function enableSignature(bytes4[] memory _functionSignatureList, uint[] memory _userGroupList) public returns(bool){
         require(_userGroupList.length > 0, "NO_USER_ROLES_DEFINED");
         require(_functionSignatureList.length > 0, "NO_SIGNATURES_DEFINED");

@@ -18,7 +18,6 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     uint N_BLOCK_DAY = uint(5760);
 
-    address DAOCreator;
     address accessibilitySettingsAddress;
 
     bytes4[] functionSignatures;
@@ -60,9 +59,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     }
 
     modifier temporaryLockSecurity(address _token){
-        if(IAccessibilitySettings(accessibilitySettingsAddress).getDAOCreator() != msg.sender){
-            require(getBlocksRemained(_token) > 0, "THIS_FUNCTION_IS_TEMPORARY_LOCKED_FOR_SECURITY");
-        }
+        require(getBlocksRemained(_token) > 0, "THIS_FUNCTION_IS_TEMPORARY_LOCKED_FOR_SECURITY");
         _;
     }
 
@@ -72,9 +69,16 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         accessibilitySettingsAddress = _accessibilitySettingsAddress;
         IAccessibilitySettings IAS = IAccessibilitySettings(accessibilitySettingsAddress);
 
-        require(IAS.setUserRole(DAOCreator, uint(UserGroup.ADMIN)), "COULDNT_SET_SENDER_SUCH_ADMIN");     // Who create the contract is admin
-        require(IAS.setUserRole(address(this), uint(UserGroup.ADMIN)), "COULDNT_SET_SMARTCONTRACT_SUCH_ADMIN");  // The contract itself is admin too
-      
+        address[] memory adminAddresses = new address[](uint(2));         
+        uint[] memory adminAddressesRefGroup = new uint[](uint(2));    
+
+        adminAddresses[0] = IAS.getDAOCreator();
+        adminAddresses[1] = address(this);
+
+        adminAddressesRefGroup[0] = uint(UserGroup.ADMIN);
+        adminAddressesRefGroup[1] = uint(UserGroup.ADMIN);
+
+        require(IAS.setUserListRole(adminAddresses, adminAddressesRefGroup), "COULDNT_SET_SENDER_SUCH_ADMIN");     // Who create the contract is admin
 
         // ------------------------------------------------------------ List of function signatures
 
@@ -95,15 +99,6 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         functionSignatures = signatures;
 
         require(IAS.enableSignature(signatures, userGroupAdminArray),"COULDNT_SET_PREDEFINED_SIGNATURES_TO_ADMIN");          
-    }
-
-    // ONLY OWNER FUNCTIONS 
-
-    function changeAccessibilitySettings(address _accessibilitySettingsAddress) public onlyDAOCreator returns(bool){
-        require(_accessibilitySettingsAddress != address(0), "CANT_SET_TO_NULL_ADDRESS");
-        accessibilitySettingsAddress = _accessibilitySettingsAddress;
-        emit ChangeAccessibilitySettingsAddressEvent(msg.sender, _accessibilitySettingsAddress);
-        return true;
     }
 
     function enableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator returns(bool){
@@ -146,15 +141,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return true;
     }
 
-    function getFunctionSignatures() public view returns(bytes4[] memory){
-        return functionSignatures;
-    }
-
-    function getBalance(address _token, address _user) public view returns(uint){
-        return accountability[_token][_user];
-    }
-
-    function approveERC20Distribution(address _token, uint _amount) public temporaryLockSecurity(_token) returns(bool){
+    function approveERC20Distribution(address _token, uint _amount) public checkAccessibility(FUNCTION_APPROVEERC20DISTR_SIGNATURE, true) temporaryLockSecurity(_token) returns(bool){
         require(_token != address(0), "CANT_REFER_TO_NULL_ADDRESS");
         require(_amount > 0, "CANT_APPROVE_NULL_AMOUNT");
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
@@ -204,11 +191,11 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     }
 
     function mintUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_MINTERC20_SIGNATURE, true) temporaryLockSecurity(_token) returns(bool){
-        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
+        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH"); 
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
         IERC20Upgradeable IERC20U = IERC20Upgradeable(_token);
-        require(IERC20U.balanceOf(address(this)) == 0 || IERC20U.balanceOf(address(this)).div(_amount) > uint(10), "MINT_AMOUNT_DISMATCH_SECURITY"); // At least I can mint the 10% of the whole balance
+        require(IERC20U.balanceOf(address(this)).div(_amount) > uint(10), "MINT_AMOUNT_DISMATCH_SECURITY"); // At least I can mint the 10% of the whole balance
         require(address(this) == IDERC20U.getOwner(), "OWNER_DISMATCH");
         tokenManagement[_token].lastBlockChange = block.number;             // No one can't burn, mint or approve for one day this token
         tokenManagement[_token].lastBlockUserOp[msg.sender] = block.number; // Sender can't redeem for one day
@@ -220,7 +207,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     function burnUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_BURNERC20_SIGNATURE, true) temporaryLockSecurity(_token) returns(bool){
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
-        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
+        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH"); 
         require(address(this) == IDERC20U.getOwner(), "OWNER_DISMATCH");
         require(IERC20Upgradeable(_token).balanceOf(address(this)).div(_amount) > uint(10), "BURN_AMOUNT_DISMATCH_SECURITY"); // At least I can burn the 10% of the whole balance
         tokenManagement[_token].lastBlockChange = block.number;             // No one can't burn, mint or approve for one day this token
@@ -232,10 +219,6 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     function getOwnUserGroupForThisSmartContract() public view returns(uint){
         return IAccessibilitySettings(accessibilitySettingsAddress).getUserGroup(msg.sender);
-    }
-
-    function getDAOCreator() public view returns(address){
-        return DAOCreator;
     }
 
     function isTokenPresentInsideTheDAO(address _token) public view returns(bool){
@@ -256,5 +239,13 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     function getBlocksUserOpRemained(address _token, address _user) public view returns(uint){
         return N_BLOCK_DAY.sub(tokenManagement[_token].lastBlockUserOp[_user]);
+    }
+
+    function getFunctionSignatures() public view returns(bytes4[] memory){
+        return functionSignatures;
+    }
+
+    function getBalance(address _token, address _user) public view returns(uint){
+        return accountability[_token][_user];
     }
 }

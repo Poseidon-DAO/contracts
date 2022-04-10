@@ -4,24 +4,23 @@ pragma solidity ^0.8.0;
 
 import './settings/core/AccessibilitySettings.sol';
 import './settings/core/Accountability.sol';
+import './interfaces/IAccessibilitySettings.sol';
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
 
 contract DAOSetup {
 
     using SafeMathUpgradeable for uint256;
 
-    address DAOCreator;
     address[] DAOSmartContractList; // not a mapping cause I need to show the function list that can be used for the front-end
 
     mapping(address => bool) smartContractsDAO;
 
     event extendDAOEvent(address indexed DAOCreator, address indexed newSmartContractAddress);
 
-    constructor(){
+    constructor(address[] memory multiSigAddresses){
 
-        DAOCreator = msg.sender;
-        address accessibilitySettingsAddress = address(new AccessibilitySettings(msg.sender));
-        address accountabilityAddress = address(new Accountability(accessibilitySettingsAddress, msg.sender));
+        address accessibilitySettingsAddress = address(new AccessibilitySettings(msg.sender, multiSigAddresses));
+        address accountabilityAddress = address(new Accountability(accessibilitySettingsAddress));
 
         smartContractsDAO[accessibilitySettingsAddress] = true;
         smartContractsDAO[accountabilityAddress] = true;
@@ -31,8 +30,9 @@ contract DAOSetup {
     }
 
     //to be run from every smart contract that will extend the DAO on the constructor
-    function extendDAO(address[] memory _smartContractAddressList) public returns(bool){
-        require(DAOCreator == msg.sender, "ONLY_CREATOR_CAN_EXTEND_DAO");
+    function extendDAO(address[] memory _smartContractAddressList, address _accessibilitySettingsAddress) public returns(bool){
+        IAccessibilitySettings IAS = IAccessibilitySettings(_accessibilitySettingsAddress);
+        require(IAS.getDAOCreator() == msg.sender, "ONLY_CREATOR_CAN_EXTEND_DAO");
         for(uint index = 0; index < _smartContractAddressList.length; index++){
             smartContractsDAO[_smartContractAddressList[index]] = true;
             emit extendDAOEvent(msg.sender, _smartContractAddressList[index]);
@@ -44,7 +44,4 @@ contract DAOSetup {
         return smartContractsDAO[_smartContractAddress];
     }
 
-    function getDAOCreator() public view returns(address){
-        return DAOCreator;
-    }
 }

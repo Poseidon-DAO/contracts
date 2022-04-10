@@ -99,7 +99,9 @@ contract AccessibilitySettings{
             DAOCreator = _voteFor;
         }
         if(_functionID == uint(pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST)){
-            multiSigLength = multiSigLength.sub(1);
+            uint newMultiSigLength = multiSigLength.sub(1);
+            require(newMultiSigLength >= uint(5), "NOT_ENOUGH_MULTISIG_ADDRESSES");
+            multiSigLength = newMultiSigLength;
             multiSig[_voteFor] = true;
         }        
         if(_functionID == uint(pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST)){

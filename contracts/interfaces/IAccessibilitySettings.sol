@@ -9,4 +9,8 @@ interface IAccessibilitySettings {
     function disableSignature(bytes4[] memory _functionSignatureList, uint[] memory _userRoles) external returns(bool);
     function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) external returns(bool);
     function getDAOCreator() external view returns(address);
+    function getIsFrozen() external view returns(bool);
+    function changeDAOCreator(address _newDAOCreator) external returns(bool);
+    function restoreIsFrozen() external returns(bool);
+    function multiSigInitialize(address _multiSigRefAddress) external returns(bool);
 }

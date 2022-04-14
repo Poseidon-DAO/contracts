@@ -17,19 +17,20 @@ contract DAOSetup {
 
     event extendDAOEvent(address indexed DAOCreator, address indexed newSmartContractAddress);
 
-    constructor(address[] memory multiSigAddresses){
+    constructor(address[] memory _multiSigAddresses){
 
-        address accessibilitySettingsAddress = address(new AccessibilitySettings(msg.sender, multiSigAddresses));
-        address accountabilityAddress = address(new Accountability(accessibilitySettingsAddress));
+        address accessibilitySettingsAddress = address(new AccessibilitySettings(msg.sender, _multiSigAddresses));
+        //address accountabilityAddress = address(new Accountability(accessibilitySettingsAddress));
 
         smartContractsDAO[accessibilitySettingsAddress] = true;
-        smartContractsDAO[accountabilityAddress] = true;
+        //smartContractsDAO[accountabilityAddress] = true;
 
         emit extendDAOEvent(msg.sender, accessibilitySettingsAddress);
-        emit extendDAOEvent(msg.sender, accountabilityAddress);
+        //emit extendDAOEvent(msg.sender, accountabilityAddress);
     }
 
-    //to be run from every smart contract that will extend the DAO on the constructor
+    // to be run from every smart contract that will extend the DAO on the constructor
+
     function extendDAO(address[] memory _smartContractAddressList, address _accessibilitySettingsAddress) public returns(bool){
         IAccessibilitySettings IAS = IAccessibilitySettings(_accessibilitySettingsAddress);
         require(IAS.getDAOCreator() == msg.sender, "ONLY_CREATOR_CAN_EXTEND_DAO");

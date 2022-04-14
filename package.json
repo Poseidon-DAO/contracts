@@ -38,6 +38,7 @@
     "ganache-cli": "^6.12.2",
     "global": "^4.4.0",
     "hardhat-etherscan": "^1.0.1",
+    "hardhat-storage-layout": "^0.1.6",
     "moment": "^2.24.0",
     "node": "^17.7.2",
     "truffle-plugin-verify": "^0.3.5",

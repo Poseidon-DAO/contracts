@@ -6,7 +6,6 @@ import '../structures/MetaDataStructure.sol';
 import '../../shared/Signatures.sol';
 import '../../interfaces/IAccessibilitySettings.sol';
 import '../../interfaces/IDynamicERC20Upgradeable.sol';
-import '../../interfaces/IDAOSetup.sol';
 import '../../standard-upgradeable-erc/ERC20-Upgradeable/DynamicERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
@@ -63,6 +62,11 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         _;
     }
 
+    modifier securityFreeze(){
+        require(IAccessibilitySettings(accessibilitySettingsAddress).getIsFrozen() == false, "THIS_FUNCTION_IS_FROZEN_FOR_SECURITY");
+        _;
+    }
+
     constructor(address _accessibilitySettingsAddress) {
 
         require(_accessibilitySettingsAddress != address(0), "CANT_SET_NULL_ADDRESS");
@@ -101,19 +105,19 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         require(IAS.enableSignature(signatures, userGroupAdminArray),"COULDNT_SET_PREDEFINED_SIGNATURES_TO_ADMIN");          
     }
 
-    function enableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator returns(bool){
+    function enableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator securityFreeze returns(bool){
         IAccessibilitySettings(accessibilitySettingsAddress).enableSignature(_signatures, _userGroup);
         return true;
     }
 
-    function disableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator returns(bool){
+    function disableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator securityFreeze returns(bool){
         IAccessibilitySettings(accessibilitySettingsAddress).disableSignature(_signatures, _userGroup);
         return true;
     }
 
     // PUBLIC FUNCTIONS WITH CHECK ACCESSIBILITY
 
-    function addBalance(address _token, address _user, uint _amount) external checkAccessibility(FUNCTION_ADDBALANCE_SIGNATURE, true) returns(bool){
+    function addBalance(address _token, address _user, uint _amount) external checkAccessibility(FUNCTION_ADDBALANCE_SIGNATURE, true) securityFreeze returns(bool){
         require(_user != address(0), "CANT_ADD_BALANCE_ON_NULL_ADDRESS");
         require(_token != address(0), "TOKEN_CANT_BE_NULL_ADDRESS");
         tokenManagement[_token].lastBlockUserOp[_user] = block.number;  // Sender can't redeem for one day this token
@@ -124,7 +128,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return true;
     }
 
-    function subBalance(address _token, address _user, uint _amount) external checkAccessibility(FUNCTION_SUBBALANCE_SIGNATURE, true) returns(bool){
+    function subBalance(address _token, address _user, uint _amount) external checkAccessibility(FUNCTION_SUBBALANCE_SIGNATURE, true) securityFreeze returns(bool){
         require(_user != address(0), "CANT_ADD_BALANCE_ON_NULL_ADDRESS");
         require(_token != address(0), "TOKEN_CANT_BE_NULL_ADDRESS");
         tokenManagement[_token].lastBlockUserOp[_user] = block.number;  // Sender can't redeem for one day this token
@@ -135,13 +139,13 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return true;
     }
 
-    function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) checkAccessibility(FUNCTION_SETUSERROLE_SIGNATURE, true) public returns(bool){
+    function setUserListRole(address[] memory _userAddress, uint[] memory _userGroup) public checkAccessibility(FUNCTION_SETUSERROLE_SIGNATURE, true) securityFreeze returns(bool){
         require(_userAddress.length == _userGroup.length, "DATA_LENGTH_DISMATCH");
         IAccessibilitySettings(accessibilitySettingsAddress).setUserListRole(_userAddress,_userGroup);
         return true;
     }
 
-    function approveERC20Distribution(address _token, uint _amount) public checkAccessibility(FUNCTION_APPROVEERC20DISTR_SIGNATURE, true) temporaryLockSecurity(_token) returns(bool){
+    function approveERC20Distribution(address _token, uint _amount) public checkAccessibility(FUNCTION_APPROVEERC20DISTR_SIGNATURE, true) temporaryLockSecurity(_token) securityFreeze returns(bool){
         require(_token != address(0), "CANT_REFER_TO_NULL_ADDRESS");
         require(_amount > 0, "CANT_APPROVE_NULL_AMOUNT");
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
@@ -151,7 +155,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return true;
     }
 
-    function redeemListOfERC20(address[] memory _tokenList) public returns(bool){
+    function redeemListOfERC20(address[] memory _tokenList) public securityFreeze returns(bool){
         uint userBalance;
         address token;
         bool result;
@@ -177,7 +181,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return true;
     }
 
-    function createUpgradeableERC20Token(string memory _tokenName, string memory _tokenSymbol, uint _totalSupply, address _referree) public checkAccessibility(FUNCTION_CREATEERC20_SIGNATURE, true) returns(bool){
+    function createUpgradeableERC20Token(string memory _tokenName, string memory _tokenSymbol, uint _totalSupply, address _referree) public checkAccessibility(FUNCTION_CREATEERC20_SIGNATURE, true) securityFreeze returns(bool){
         DynamicERC20Upgradeable tokenUpgradeable = new DynamicERC20Upgradeable();
         address tokenAddress = address(tokenUpgradeable);
         tokenUpgradeable.initialize(_tokenName, _tokenSymbol);
@@ -190,7 +194,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return true;
     }
 
-    function mintUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_MINTERC20_SIGNATURE, true) temporaryLockSecurity(_token) returns(bool){
+    function mintUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_MINTERC20_SIGNATURE, true) temporaryLockSecurity(_token) securityFreeze returns(bool){
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH"); 
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
@@ -204,7 +208,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return true;
     }
 
-    function burnUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_BURNERC20_SIGNATURE, true) temporaryLockSecurity(_token) returns(bool){
+    function burnUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_BURNERC20_SIGNATURE, true) temporaryLockSecurity(_token) securityFreeze returns(bool){
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
         IDynamicERC20Upgradeable IDERC20U = IDynamicERC20Upgradeable(_token);
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH"); 

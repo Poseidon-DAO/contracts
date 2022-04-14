@@ -6,16 +6,16 @@ const { web3 } = require('web3')
 const Web3Utils = require('web3-utils');
 const showLog = false;
 
-const BYTES4DATA = [Web3Utils.toHex('A1B2'), Web3Utils.toHex('B2C3')];
+const BYTES4DATA = [Web3Utils.toHex('A1B2'), Web3Utils.toHex('B2C3')]; // Example bytes4 Data
 
-async function setupDAODeploy() {
+async function setupDAODeploy(multiSigAddressList) {
   const DAOSetupContractFactory = await ethers.getContractFactory("DAOSetup");
-  return await DAOSetupContractFactory.deploy();
+  return await DAOSetupContractFactory.deploy(multiSigAddressList);
 }
 
-async function accessibilitySettingsDeploy(owner) {
+async function accessibilitySettingsDeploy(owner, multiSigAddressList) {
   const AccessibilitySettingsContractFactory = await ethers.getContractFactory("AccessibilitySettings");
-  return await AccessibilitySettingsContractFactory.deploy(owner);
+  return await AccessibilitySettingsContractFactory.deploy(owner, multiSigAddressList);
 }
 
 async function accountabilityDeploy(accessibilitySettingsAddress, owner) {
@@ -26,29 +26,29 @@ async function accountabilityDeploy(accessibilitySettingsAddress, owner) {
 describe("Unit Test: DAO Setup", function () {
   let DAOSetup;
   let smartContractsDAO;
-  let owner, add1, add2, add3, add4;
+  let owner, add1, add2, add3, add4, add5, add6, add7, add8, add9;
+  let multiSigAddressList;
+  let IAccessibilitySettings;
 
   beforeEach(async () => {
-    // Deploy DAO
-    DAOSetup = await setupDAODeploy();
+    [owner, add1, add2, add3, add4, add5, add6, add7, add8, add9] = await ethers.getSigners();
+    multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
+    DAOSetup = await setupDAODeploy(multiSigAddressList);
     const events = await DAOSetup.queryFilter(DAOSetup.filters.extendDAOEvent());
     smartContractsDAO = new Array();
-    // Get Smart Contract List
     events.forEach(event => {
         smartContractsDAO.push(event.args.newSmartContractAddress);
     });
-    // Get Test Addresses
-    [owner, add1, add2, add3, add4] = await ethers.getSigners();
+    IAccessibilitySettings = await ethers.getContractAt("IAccessibilitySettings", smartContractsDAO[0]);
   });
 
-  it("DAO Creator is who create the DAO", async function () {
-    expect(await DAOSetup.getDAOCreator()).to.equal(await owner.address);
-    if(showLog) console.log(owner.address);
 
+  it("DAO Creator is who create the DAO", async function () {
+    expect(await IAccessibilitySettings.getDAOCreator()).to.equal(await owner.address);
   });
 
   it("Stranger Address is not the DAO Creator", async function () {
-    expect(await DAOSetup.getDAOCreator()).to.not.equal(await add1.address);
+    expect(await IAccessibilitySettings.getDAOCreator()).to.not.equal(await add1.address);
   });
 
   it("Owner can extend DAO", async function () {
@@ -76,48 +76,33 @@ describe("Unit Test: DAO Setup", function () {
   });
 });
 
-describe("Integrate Test: SetupDAO - Accessibility Settings", function () {
-  let DAOSetup;
-  let smartContractsDAO;
-  let IAccessibilitySettings
-  let owner;
-  beforeEach(async () => {
-    // Deploy DAO
-    DAOSetup = await setupDAODeploy();
-    const events = await DAOSetup.queryFilter(DAOSetup.filters.extendDAOEvent());
-    smartContractsDAO = new Array();
-    // Get Smart Contract List
-    events.forEach(event => {
-        smartContractsDAO.push(event.args.newSmartContractAddress);
-    });
-    // Get Test Addresses
-    [owner] = await ethers.getSigners();
-    IAccessibilitySettings = await ethers.getContractAt("IAccessibilitySettings", smartContractsDAO[0]);
-  });
-
-  it("Who creates the DAO is superAdmin of Accessibility Settings", async function () {
-    expect(await IAccessibilitySettings.getDAOCreator()).to.equal(await owner.address);
-    if(showLog) console.log(owner.address);
-  });
-
-});
-
 describe("Unit Test: Deploy Accessibility Settings", function () {
 
+  let owner, add1, add2, add3, add4, add5, add6, add7, add8, add9;
+  let multiSigAddressList;
+
+  beforeEach(async () => {
+    // Deploy DAO
+    [owner, add1, add2, add3, add4, add5, add6, add7, add8, add9] = await ethers.getSigners();
+    multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
+  });
+
   it("Can't Deploy for accessibilitySettings NULL Address", async function () {
-    await expect(accessibilitySettingsDeploy(ZERO_ADDRESS)).to.be.revertedWith("CANT_SET_NULL_ADDRESS");
+    await expect(accessibilitySettingsDeploy(ZERO_ADDRESS, multiSigAddressList)).to.be.revertedWith("CANT_SET_NULL_ADDRESS");
   });
 
 });
 
 describe("Unit Test: Accessibility Settings", function () {
   let accessibilitySettings
-  let owner, add1, add2, add3, add4;
+  let owner, add1, add2, add3, add4, add5, add6, add7, add8, add9;
+  let multiSigAddressList;
 
   beforeEach(async () => {
     // Get Test Addresses
-    [owner, add1, add2, add3, add4] = await ethers.getSigners();
-    accessibilitySettings = await accessibilitySettingsDeploy(owner.address);
+    [owner, add1, add2, add3, add4, add5, add6, add7, add8, add9] = await ethers.getSigners();
+    multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
+    accessibilitySettings = await accessibilitySettingsDeploy(owner.address, multiSigAddressList);
   });
 
   it("Enable signature", async function () {
@@ -143,8 +128,7 @@ describe("Unit Test: Accessibility Settings", function () {
   });
 
   it("Disable signature", async function () {
-    const groupIndexList = [2, 3];    accessibilitySettings = await accessibilitySettingsDeploy(owner.address);
-
+    const groupIndexList = [2, 3];    
     const disableGroupIndexList = [3];
     await accessibilitySettings.connect(add1).enableSignature(BYTES4DATA, groupIndexList);
     await accessibilitySettings.connect(add1).disableSignature(BYTES4DATA, disableGroupIndexList);
@@ -284,19 +268,21 @@ describe("Integrate Test: SetupDAO - Accountability", function () {
   let DAOSetup;
   let smartContractsDAO;
   let IAccountability
-  let owner;
+  let accessibilitySettings;
+  let owner, add1, add2, add3, add4, add5, add6, add7, add8, add9;
+  let multiSigAddressList;
 
   beforeEach(async () => {
     // Deploy DAO
-    DAOSetup = await setupDAODeploy();
+    [owner, add1, add2, add3, add4, add5, add6, add7, add8, add9] = await ethers.getSigners();
+    multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
+    accessibilitySettings = await accessibilitySettingsDeploy(owner.address, multiSigAddressList);
     const events = await DAOSetup.queryFilter(DAOSetup.filters.extendDAOEvent());
     smartContractsDAO = new Array();
     // Get Smart Contract List
     events.forEach(event => {
         smartContractsDAO.push(event.args.newSmartContractAddress);
     });
-    // Get Test Addresses
-    [owner] = await ethers.getSigners();
     IAccountability = await ethers.getContractAt("IAccountability", smartContractsDAO[1]);
   });
 
@@ -309,6 +295,16 @@ describe("Integrate Test: SetupDAO - Accountability", function () {
 
 describe("Unit Test: Can't Deploy Accountability if DAO Creator is set to NULL or Accessibility is NULL", function () {
 
+  let owner, add1, add2, add3, add4, add5, add6, add7, add8, add9;
+  let multiSigAddressList;
+
+  beforeEach(async () => {
+    // Deploy DAO
+    [owner, add1, add2, add3, add4, add5, add6, add7, add8, add9] = await ethers.getSigners();
+    multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
+  });
+
+
   it("Can't Deploy for accessibilitySettings NULL Address", async function () {
     const [owner] = await ethers.getSigners();
     await expect(accountabilityDeploy(ZERO_ADDRESS, owner.address)).to.be.revertedWith("CANT_SET_NULL_ADDRESS");
@@ -316,7 +312,7 @@ describe("Unit Test: Can't Deploy Accountability if DAO Creator is set to NULL o
 
   it("Can't Deploy for DAO Creator NULL Address", async function () {
     const [owner] = await ethers.getSigners();
-    const accessibilitySettings = await accessibilitySettingsDeploy(owner.address);
+    const accessibilitySettings = await accessibilitySettingsDeploy(owner.address, multiSigAddressList);
     await expect(accountabilityDeploy(accessibilitySettings.address, ZERO_ADDRESS)).to.be.revertedWith("CANT_SET_NULL_ADDRESS");
   });
 });
@@ -324,13 +320,13 @@ describe("Unit Test: Can't Deploy Accountability if DAO Creator is set to NULL o
 describe("Unit Test: Accountability", function () {
 
   let accessibilitySettings;
-  let IAccessibilitySettings;
   let accountability;
-  let owner, add1, add2, add3, add4;
+  let owner, add1, add2, add3, add4, add5, add6, add7, add8, add9;
 
   beforeEach(async () => {
     [owner, add1, add2, add3, add4] = await ethers.getSigners();
-    accessibilitySettings = await accessibilitySettingsDeploy(owner.address);
+    const multiSigSignersList = [owner, add5, add6, add7, add8];
+    accessibilitySettings = await accessibilitySettingsDeploy(owner.address, multiSigSignersList);
     accountability = await accountabilityDeploy(accessibilitySettings.address, owner.address);
   });
 

@@ -3,18 +3,23 @@
 pragma solidity ^0.8.3; 
 
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol'; 
+import '../../interfaces/IAccountability.sol';
 
 contract DynamicERC20Upgradeable is ERC20Upgradeable { 
  
-    address public owner; 
+    address public accountabilityAddress; 
     
+    constructor(address _accountabilityAddress) {
+        accountabilityAddress = _accountabilityAddress;
+    }
+
     function initialize(string memory _name, string memory _symbol) initializer public {
         __ERC20_init(_name, _symbol);
-        owner = msg.sender; 
+        registerToDAO();
     }
 
     function mint(address _to, uint _totalSupply, uint _decimals) external returns(bool){ 
-        require(msg.sender == owner, "UNAUTHORIZED_ACCESS"); 
+        require(msg.sender == accountabilityAddress, "UNAUTHORIZED_ACCESS"); 
         _mint(_to, _totalSupply * (10 ** _decimals)); 
         return true;
     } 
@@ -24,7 +29,8 @@ contract DynamicERC20Upgradeable is ERC20Upgradeable {
         return true;
     }
     
-    function getOwner() public view returns(address){
-        return owner;
+    function registerToDAO() private returns(bool){
+        IAccountability(accountabilityAddress).registerUpgradeableERC20Token(msg.sender);
+        return true;
     }
 }

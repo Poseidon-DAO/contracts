@@ -56,6 +56,7 @@ describe("Unit Test: MultiSig", function () {
         [owner, add1, add2, add3, add4, add5, add6, add7, add8] = await ethers.getSigners();
         multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
         AccessibilitySettings = await accessibilitySettingsDeploy();
+        AccessibilitySettings.initialize();
         MultiSig = await multiSigDeploy(AccessibilitySettings.address, multiSigAddressList);
     });
   
@@ -230,6 +231,7 @@ describe("Unit Test: Dynamic ERC20 Token", function () {
         [owner, add1, add2, add3, add4, add5, add6, add7, add8] = await ethers.getSigners();
         multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
         AccessibilitySettings = await accessibilitySettingsDeploy();                                // Smart Contracts has to be
+        AccessibilitySettings.initialize();
         MultiSig = await multiSigDeploy(AccessibilitySettings.address, multiSigAddressList);        // executed in this order
         Accountability = await accountabilityDeploy(AccessibilitySettings.address);                 // to run properly all variables
         DynamicERC20Upgradeable = await dynamicERC20UpgradeableDeploy(Accountability.address);      // inside of them
@@ -274,6 +276,11 @@ describe("Unit Test: Accessibility Settings", function () {
     [owner, add1, add2, add3, add4, add5, add6, add7, add8, add9] = await ethers.getSigners();
     multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
     accessibilitySettings = await accessibilitySettingsDeploy();
+    accessibilitySettings.initialize();
+  });
+
+  it("Can't initialize two times the same smart contract", async function () {
+    await expect(accessibilitySettings.connect(owner).initialize()).to.be.revertedWith("Initializable: contract is already initialized");
   });
 
   it("Enable signature", async function () {
@@ -428,6 +435,7 @@ describe("Unit Test: Accountability", function () {
     [owner, add1, add2, add3, add4, add5, add6, add7, add8] = await ethers.getSigners();
     multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
     accessibilitySettings = await accessibilitySettingsDeploy();                                // Smart Contracts has to be
+    accessibilitySettings.initialize();
     multiSig = await multiSigDeploy(accessibilitySettings.address, multiSigAddressList);        // executed in this order
     accountability = await accountabilityDeploy(accessibilitySettings.address);                 // to run properly all variables
     dynamicERC20Upgradeable = await dynamicERC20UpgradeableDeploy(accountability.address);      // inside of them

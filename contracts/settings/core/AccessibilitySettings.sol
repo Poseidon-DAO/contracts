@@ -2,19 +2,17 @@
 
 pragma solidity ^0.8.3;
 
-
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
 import '../../interfaces/IMultiSig.sol';
 import './MultiSig.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
-contract AccessibilitySettings{
+contract AccessibilitySettings is Initializable{
 
     using SafeMathUpgradeable for uint256;
 
     mapping(address => mapping(bytes4 => mapping(uint => bool))) Accessibility; //SMART CONTRACT => SIGNATURE => USER GROUP => ACCESSIBILITY
     mapping(address => mapping(address => uint)) AccessibilityGroup; // SMART CONTRACT => USER => USER GROUP
-
-    // In another way: SMART CONTRACT => SIGNATURE => (SMART CONTRACT => USER => USER GROUP) => ACCESSIBILITY
 
     event ChangeUserGroupEvent(address indexed caller, address indexed user, uint newGroup);
     event ChangeGroupAccessibilityEvent(address indexed smartContractReference, bytes4 indexed functionSignature, uint groupReference, bool Accessibility);
@@ -34,7 +32,8 @@ contract AccessibilitySettings{
         require(IMultiSig(multiSigRefAddress).getIsMultiSigAddress(msg.sender), "NOT_ENABLED_TO_RUN_THIS_FUNCTION");
         _;
     }
-    constructor (){
+
+    function initialize () public initializer {
         DAOCreator = msg.sender;    
     }
 

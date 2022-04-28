@@ -8,15 +8,18 @@ import '../../interfaces/IAccessibilitySettings.sol';
 import '../../interfaces/IDynamicERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
 
-contract Accountability is Signatures, MetaDataStructure {
+contract Accountability is Signatures, MetaDataStructure, Initializable {
  
     using SafeMathUpgradeable for uint256;
 
-    uint N_BLOCK_DAY = uint(5760);
-    uint MIN_AMOUNT_TO_MINT = uint(10);
-    uint MIN_PERC_TO_MINT = uint(10);
+    uint public N_BLOCK_DAY;
+    uint public MIN_MINT_AMOUNT;
+    uint public MAX_PERC_TO_MINT;
+    uint public MAX_PERC_TO_BURN;
+
     address accessibilitySettingsAddress;
 
     mapping(address => mapping(address => uint)) public accountability; // TOKEN -> ADDRESS -> BALANCE
@@ -33,6 +36,7 @@ contract Accountability is Signatures, MetaDataStructure {
     struct tokenManagementMetaData {
         uint lastBlockChange;
         mapping(address => uint) lastBlockUserOp;
+        uint decimals;
     }
 
     enum opID {
@@ -55,7 +59,7 @@ contract Accountability is Signatures, MetaDataStructure {
     }
 
     modifier temporaryLockSecurity(address _token){
-        require(N_BLOCK_DAY.sub(block.number.sub(tokenManagement[_token].lastBlockChange)) > 0, "SECURITY_LOCK");
+        require(block.number.sub(N_BLOCK_DAY.add(tokenManagement[_token].lastBlockChange)) >= 0, "SECURITY_LOCK");
         _;
     }
 
@@ -64,8 +68,7 @@ contract Accountability is Signatures, MetaDataStructure {
         _;
     }
 
-    constructor(address _accessibilitySettingsAddress) {
-
+    function initialize(address _accessibilitySettingsAddress) public initializer {
         require(_accessibilitySettingsAddress != address(0), "NO_NULL_ADD");
         accessibilitySettingsAddress = _accessibilitySettingsAddress;
         IAccessibilitySettings IAS = IAccessibilitySettings(accessibilitySettingsAddress);
@@ -85,19 +88,25 @@ contract Accountability is Signatures, MetaDataStructure {
 
         bytes4[] memory signatures = new bytes4[](uint(8));         // Number of signatures
         uint[] memory userGroupAdminArray = new uint[](uint(1));    // Number of Group Admin
-
-        signatures[0] = FUNCTION_ADDBALANCE_SIGNATURE;
-        signatures[1] = FUNCTION_SUBBALANCE_SIGNATURE;
-        signatures[2] = FUNCTION_SETUSERROLE_SIGNATURE;
-        signatures[3] = FUNCTION_CREATEERC20_SIGNATURE;
-        signatures[4] = FUNCTION_APPROVEERC20DISTR_SIGNATURE;
-        signatures[5] = FUNCTION_CREATEERC20_SIGNATURE;
-        signatures[6] = FUNCTION_BURNERC20_SIGNATURE;
-        signatures[7] = FUNCTION_MINTERC20_SIGNATURE;
+        uint index = 0;
+        signatures[index++] = FUNCTION_ADDBALANCE_SIGNATURE;
+        signatures[index++] = FUNCTION_SUBBALANCE_SIGNATURE;
+        signatures[index++] = FUNCTION_SETUSERROLE_SIGNATURE;
+        signatures[index++] = FUNCTION_CREATEERC20_SIGNATURE;
+        signatures[index++] = FUNCTION_APPROVEERC20DISTR_SIGNATURE;
+        signatures[index++] = FUNCTION_BURNERC20_SIGNATURE;
+        signatures[index++] = FUNCTION_MINTERC20_SIGNATURE;
 
         userGroupAdminArray[0] = uint(UserGroup.ADMIN);
 
-        IAS.enableSignature(signatures, userGroupAdminArray);          
+        IAS.enableSignature(signatures, userGroupAdminArray);   
+
+        // ------------------------------------------------------------ Setting default constant
+
+        N_BLOCK_DAY = uint(5760);
+        MIN_MINT_AMOUNT = uint(1000);
+        MAX_PERC_TO_MINT = uint(5);  
+        MAX_PERC_TO_BURN = uint(5);
     }
 
     function enableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator securityFreeze returns(bool){
@@ -144,9 +153,10 @@ contract Accountability is Signatures, MetaDataStructure {
         require(_token != address(0), "NULL_ADD_NOT_ALLOWED");
         require(_amount > 0, "NULL_AMOUNT_NOT_ALLOWED");
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
-        IERC20Upgradeable(_token).approve(address(this), _amount);
+        uint decimals = tokenManagement[_token].decimals;
+        IERC20Upgradeable(_token).approve(address(this), _amount.mul(uint(10) ** decimals));
         tokenManagement[_token].lastBlockChange = block.number;
-        emit SecurityTokenMovements(msg.sender, _token, uint(opID.APPROVE), _amount);
+        emit SecurityTokenMovements(msg.sender, _token, uint(opID.APPROVE), _amount.mul(uint(10) ** decimals));
         return true;
     }
 
@@ -159,7 +169,7 @@ contract Accountability is Signatures, MetaDataStructure {
             tokenManagement[_tokenList[index]].lastBlockUserOp[msg.sender] = block.number;
             token = _tokenList[index];
             userBalance = accountability[token][msg.sender];
-            if(userBalance > 0 && N_BLOCK_DAY.sub(tokenManagement[token].lastBlockUserOp[msg.sender]) > 0){
+            if(userBalance > 0 && N_BLOCK_DAY > block.number.sub(tokenManagement[token].lastBlockUserOp[msg.sender])){
                 tokenManagement[_tokenList[index]].lastBlockUserOp[msg.sender] = block.number;  // Sender can't redeem again for one day this token after setting this
                 accountability[token][msg.sender] = uint(0);
                 require(IERC20Upgradeable(token).balanceOf(address(this)) >= userBalance, "NO_DAO_FUND");
@@ -174,41 +184,47 @@ contract Accountability is Signatures, MetaDataStructure {
         return true;
     }
 
-    function registerUpgradeableERC20Token(address _referree) external securityFreeze returns(bool){
+    function registerUpgradeableERC20Token(address _referree, uint _decimals) external securityFreeze returns(bool){
         tokenReferreal[msg.sender] = _referree;                                // msg.sender has to be DUERC20
         tokenManagement[msg.sender].lastBlockChange = block.number;            // No one can't burn, mint or approve for one day this token
         tokenManagement[msg.sender].lastBlockUserOp[_referree] = block.number; // Referee can't redeem for one day this token
+        tokenManagement[msg.sender].decimals = _decimals; // Referee can't redeem for one day this token
         emit RegisterERC20UpgradeableEvent(msg.sender, _referree);
         emit SecurityTokenMovements(_referree, msg.sender, uint(opID.CREATE), uint(0));
         return true;
     }
 
     function mintUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_MINTERC20_SIGNATURE, true) temporaryLockSecurity(_token) securityFreeze returns(bool){
-        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH"); 
+        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");  /////////////////////////TO CHECK
         require(_amount > 0, "INSUFFICIENT_AMOUNT");
-        uint tokenBalance = IERC20Upgradeable(_token).balanceOf(address(this));
-        bool securityMint = true;
-        if(tokenBalance > MIN_AMOUNT_TO_MINT) {
-            if(tokenBalance.div(_amount) > uint(MIN_PERC_TO_MINT)){
-                securityMint = false;
+        IERC20Upgradeable IERC20U = IERC20Upgradeable(_token);
+        uint tokenBalance = IERC20U.balanceOf(address(this));
+        bool safetyMint = true;
+        uint decimals = tokenManagement[_token].decimals;
+        if(tokenBalance > MIN_MINT_AMOUNT){
+            if(_amount > uint(MAX_PERC_TO_MINT).mul(tokenBalance.div(uint(10) ** (decimals + uint(2))))){
+                safetyMint = false;
             }
         }
-        require(securityMint, "SECURITY_DISMATCH"); // At least I can mint the 10% of the whole balance
+        require(safetyMint, "SECURITY_DISMATCH");
         tokenManagement[_token].lastBlockChange = block.number;             // No one can't burn, mint or approve for one day this token
         tokenManagement[_token].lastBlockUserOp[msg.sender] = block.number; // Sender can't redeem for one day
-        IDynamicERC20Upgradeable(_token).mint(address(this), _amount, 18);
-        emit SecurityTokenMovements(msg.sender, _token, uint(opID.MINT), _amount);
+        IDynamicERC20Upgradeable(_token).mint(address(this), _amount, decimals);
+        emit SecurityTokenMovements(msg.sender, _token, uint(opID.MINT), _amount.mul(uint(10) ** decimals));
         return true;
     }
 
     function burnUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_BURNERC20_SIGNATURE, true) temporaryLockSecurity(_token) securityFreeze returns(bool){
-        require(_amount > 0, "INSUFFICIENT_AMOUNT");
-        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH"); 
-        require(IERC20Upgradeable(_token).balanceOf(address(this)).div(_amount) > uint(10), "BALANCE_SECURITY_DISMATCH"); // At least I can burn the 10% of the whole balance
+        require(_amount > 0, "INSUFFICIENT_AMOUNT"); ///////////////////////////////TO CHECK
+        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");
+        IERC20Upgradeable IERC20U = IERC20Upgradeable(_token);
+        uint tokenBalance = IERC20U.balanceOf(address(this));
+        uint decimals = tokenManagement[_token].decimals;
+        require(tokenBalance > 0 && _amount <= uint(MAX_PERC_TO_BURN).mul(tokenBalance.div(uint(10) ** (decimals + uint(2)))), "SECURITY_DISMATCH"); 
         tokenManagement[_token].lastBlockChange = block.number;             // No one can't burn, mint or approve for one day this token
         tokenManagement[_token].lastBlockUserOp[msg.sender] = block.number; // Sender can't redeem for one day
-        IDynamicERC20Upgradeable(_token).burn(_amount);
-        emit SecurityTokenMovements(msg.sender, _token, uint(opID.BURN), _amount);
+        IDynamicERC20Upgradeable(_token).burn(_amount.mul(uint(10) ** decimals));
+        emit SecurityTokenMovements(msg.sender, _token, uint(opID.BURN), _amount.mul(uint(10) ** decimals));
         return true;
     }
 
@@ -223,4 +239,5 @@ contract Accountability is Signatures, MetaDataStructure {
     function getBalance(address _token, address _user) public view returns(uint){
         return accountability[_token][_user];
     }
+
 }

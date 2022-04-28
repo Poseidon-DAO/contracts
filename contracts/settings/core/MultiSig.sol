@@ -4,8 +4,9 @@ pragma solidity ^0.8.3;
 
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
 import '../../interfaces/IAccessibilitySettings.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
-contract MultiSig {
+contract MultiSig is Initializable{
 
     using SafeMathUpgradeable for uint256;
  
@@ -39,7 +40,7 @@ contract MultiSig {
     event VoteMultisigPollEvent(address indexed voter, uint pollIndex, address voteFor);
     event ChangeStatementMultisigPollEvent(address voted, uint pollType);
 
-    constructor (address _accessibilitySettingsAddress, address[] memory _multiSigAddresses){
+    function initialize(address _accessibilitySettingsAddress, address[] memory _multiSigAddresses) public {
         require(_accessibilitySettingsAddress != address(0), "CANT_SET_NULL_ADDRESS");
         require(_multiSigAddresses.length >= 5, "MULTISIG_NEEDS_MIN_5_ADDRESSES");
         accessibilitySettingsAddress = _accessibilitySettingsAddress;

@@ -7,7 +7,7 @@ import '../../interfaces/IMultiSig.sol';
 import './MultiSig.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
 
-contract AccessibilitySettings is Initializable{
+contract AccessibilitySettings is Initializable {
 
     using SafeMathUpgradeable for uint256;
 

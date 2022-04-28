@@ -12,7 +12,7 @@ interface IAccountability {
         function getFunctionSignatures() external view returns(bytes4[] memory);
         function approveERC20Distribution(address _token, uint _amount) external returns(bool);
         function redeemListOfERC20(address[] memory _tokenList) external returns(bool);
-        function registerUpgradeableERC20Token(address _referree) external returns(bool);
+        function registerUpgradeableERC20Token(address _referree, uint _decimals) external returns(bool);
         function mintUpgradeableERC20Token(address _token, uint _amount) external returns(bool);
         function burnUpgradeableERC20Token(address _token, uint _amount) external returns(bool);
         function initializeUpgradableToken(address _tokenAddress) external returns(bool);

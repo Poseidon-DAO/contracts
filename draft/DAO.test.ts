@@ -293,29 +293,6 @@ describe("Integrate Test: SetupDAO - Accountability", function () {
 
 });
 
-describe("Unit Test: Can't Deploy Accountability if DAO Creator is set to NULL or Accessibility is NULL", function () {
-
-  let owner, add1, add2, add3, add4, add5, add6, add7, add8, add9;
-  let multiSigAddressList;
-
-  beforeEach(async () => {
-    // Deploy DAO
-    [owner, add1, add2, add3, add4, add5, add6, add7, add8, add9] = await ethers.getSigners();
-    multiSigAddressList = [owner.address, add5.address, add6.address, add7.address, add8.address];
-  });
-
-
-  it("Can't Deploy for accessibilitySettings NULL Address", async function () {
-    const [owner] = await ethers.getSigners();
-    await expect(accountabilityDeploy(ZERO_ADDRESS, owner.address)).to.be.revertedWith("CANT_SET_NULL_ADDRESS");
-  });
-
-  it("Can't Deploy for DAO Creator NULL Address", async function () {
-    const [owner] = await ethers.getSigners();
-    const accessibilitySettings = await accessibilitySettingsDeploy(owner.address, multiSigAddressList);
-    await expect(accountabilityDeploy(accessibilitySettings.address, ZERO_ADDRESS)).to.be.revertedWith("CANT_SET_NULL_ADDRESS");
-  });
-});
 
 describe("Unit Test: Accountability", function () {
 

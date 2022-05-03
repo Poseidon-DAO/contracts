@@ -15,13 +15,13 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
  
     using SafeMathUpgradeable for uint256;
 
-    uint public N_BLOCK_DAY;
+    uint public securityDelay;
     uint public MIN_MINT_AMOUNT;
     uint public MAX_PERC_TO_MINT;
-    uint public MAX_PERC_TO_BURN;
-
-    address accessibilitySettingsAddress;
-
+    uint public MAX_PERC_TO_BURN; 
+    
+    address public accessibilitySettingsAddress;
+    
     mapping(address => mapping(address => uint)) public accountability; // TOKEN -> ADDRESS -> BALANCE
     mapping(address => address) public tokenReferreal; //TOKEN => ADDRESS (user reference that is "owner" of the token)
     mapping(address => tokenManagementMetaData) public tokenManagement;
@@ -59,7 +59,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
     }
 
     modifier temporaryLockSecurity(address _token){
-        require(block.number.sub(N_BLOCK_DAY.add(tokenManagement[_token].lastBlockChange)) >= 0, "SECURITY_LOCK");
+        require(block.number.sub(securityDelay.add(tokenManagement[_token].lastBlockChange)) >= 0, "SECURITY_LOCK");
         _;
     }
 
@@ -68,7 +68,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         _;
     }
 
-    function initialize(address _accessibilitySettingsAddress) public initializer {
+    function initialize(address _accessibilitySettingsAddress, uint _securityDelay) public initializer {
         require(_accessibilitySettingsAddress != address(0), "NO_NULL_ADD");
         accessibilitySettingsAddress = _accessibilitySettingsAddress;
         IAccessibilitySettings IAS = IAccessibilitySettings(accessibilitySettingsAddress);
@@ -103,7 +103,8 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
         // ------------------------------------------------------------ Setting default constant
 
-        N_BLOCK_DAY = uint(5760);
+        // PARAMETRIZZARE
+        securityDelay = _securityDelay;
         MIN_MINT_AMOUNT = uint(1000);
         MAX_PERC_TO_MINT = uint(5);  
         MAX_PERC_TO_BURN = uint(5);
@@ -116,6 +117,12 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     function disableListOfSignaturesForGroupUser(bytes4[] memory _signatures, uint[] memory _userGroup) public onlyDAOCreator securityFreeze returns(bool){
         IAccessibilitySettings(accessibilitySettingsAddress).disableSignature(_signatures, _userGroup);
+        return true;
+    }
+
+    function changeSecurityDelay(uint _securityDelay) public onlyDAOCreator securityFreeze returns(bool){
+        require(securityDelay != _securityDelay, "CANT_SET_THE_SAME_VALUE");
+        securityDelay = _securityDelay;
         return true;
     }
 
@@ -169,7 +176,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
             tokenManagement[_tokenList[index]].lastBlockUserOp[msg.sender] = block.number;
             token = _tokenList[index];
             userBalance = accountability[token][msg.sender];
-            if(userBalance > 0 && N_BLOCK_DAY > block.number.sub(tokenManagement[token].lastBlockUserOp[msg.sender])){
+            if(userBalance > 0 && securityDelay > block.number.sub(tokenManagement[token].lastBlockUserOp[msg.sender])){
                 tokenManagement[_tokenList[index]].lastBlockUserOp[msg.sender] = block.number;  // Sender can't redeem again for one day this token after setting this
                 accountability[token][msg.sender] = uint(0);
                 require(IERC20Upgradeable(token).balanceOf(address(this)) >= userBalance, "NO_DAO_FUND");
@@ -238,6 +245,10 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
 
     function getBalance(address _token, address _user) public view returns(uint){
         return accountability[_token][_user];
+    }
+    
+    function getAccessibilitySettingsAddress() public view returns(address){
+        return accessibilitySettingsAddress;
     }
 
 }

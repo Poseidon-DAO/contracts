@@ -4,13 +4,15 @@ pragma solidity ^0.8.3;
 
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol'; 
 import '../../interfaces/IAccountability.sol';
-
+import '../../interfaces/IMultiSig.sol';
+import '../../interfaces/IAccessibilitySettings.sol';
 contract DynamicERC20Upgradeable is ERC20Upgradeable { 
  
     address public accountabilityAddress; 
 
     function initialize(address _accountabilityAddress, string memory _name, string memory _symbol, uint _decimals) initializer public {
         __ERC20_init(_name, _symbol);
+        require(IMultiSig(IAccessibilitySettings(IAccountability(_accountabilityAddress).getAccessibilitySettingsAddress()).getMultiSigRefAddress()).getIsMultiSigAddress(msg.sender), "REQUIRE_MULTISIG");
         accountabilityAddress = _accountabilityAddress;
         registerToDAO(_accountabilityAddress, _decimals);
     }

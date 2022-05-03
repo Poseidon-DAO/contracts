@@ -13,4 +13,5 @@ interface IAccessibilitySettings {
     function changeDAOCreator(address _newDAOCreator) external returns(bool);
     function restoreIsFrozen() external returns(bool);
     function multiSigInitialize(address _multiSigRefAddress) external returns(bool);
+    function getMultiSigRefAddress() external view returns(address);
 }

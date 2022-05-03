@@ -20,4 +20,5 @@ interface IAccountability {
         function getDAOCreator() external view returns(address);
         function isTokenPresentInsideTheDAO(address _token) external view returns(bool);
         function getAccessibility(bytes4 _functionSignature) external view returns(bool);
+        function getAccessibilitySettingsAddress() external view returns(address);
 }

@@ -17,8 +17,8 @@ contract AccessibilitySettings is Initializable {
     event ChangeUserGroupEvent(address indexed caller, address indexed user, uint newGroup);
     event ChangeGroupAccessibilityEvent(address indexed smartContractReference, bytes4 indexed functionSignature, uint groupReference, bool Accessibility);
 
-    address DAOCreator;
-    address multiSigRefAddress;
+    address public DAOCreator;
+    address public multiSigRefAddress;
 
     bool public isFrozen;
     bool multiSigInitilized;
@@ -119,5 +119,9 @@ contract AccessibilitySettings is Initializable {
         multiSigRefAddress = _multiSigRefAddress;
         multiSigInitilized = true;
         return true;
+    }
+
+    function getMultiSigRefAddress() public view returns(address){
+        return multiSigRefAddress;
     }
 }

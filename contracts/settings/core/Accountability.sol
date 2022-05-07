@@ -201,26 +201,6 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         return true;
     }
 
-    function mintUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_MINTERC20_SIGNATURE, true) temporaryLockSecurity(_token) securityFreeze returns(bool){
-        require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");  /////////////////////////TO CHECK
-        require(_amount > 0, "INSUFFICIENT_AMOUNT");
-        IERC20Upgradeable IERC20U = IERC20Upgradeable(_token);
-        uint tokenBalance = IERC20U.balanceOf(address(this));
-        bool safetyMint = true;
-        uint decimals = tokenManagement[_token].decimals;
-        if(tokenBalance > MIN_MINT_AMOUNT){
-            if(_amount > uint(MAX_PERC_TO_MINT).mul(tokenBalance.div(uint(10) ** (decimals + uint(2))))){
-                safetyMint = false;
-            }
-        }
-        require(safetyMint, "SECURITY_DISMATCH");
-        tokenManagement[_token].lastBlockChange = block.number;             // No one can't burn, mint or approve for one day this token
-        tokenManagement[_token].lastBlockUserOp[msg.sender] = block.number; // Sender can't redeem for one day
-        IDynamicERC20Upgradeable(_token).mint(address(this), _amount, decimals);
-        emit SecurityTokenMovements(msg.sender, _token, uint(opID.MINT), _amount.mul(uint(10) ** decimals));
-        return true;
-    }
-
     function burnUpgradeableERC20Token(address _token, uint _amount) public checkAccessibility(FUNCTION_BURNERC20_SIGNATURE, true) temporaryLockSecurity(_token) securityFreeze returns(bool){
         require(_amount > 0, "INSUFFICIENT_AMOUNT"); ///////////////////////////////TO CHECK
         require(tokenReferreal[_token] == msg.sender, "REFEREE_DISMATCH");

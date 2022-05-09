@@ -52,6 +52,7 @@ contract posToken is ERC20Upgradeable {
     function closeStake() public returns(bool){
         require(block.number > endBlockStake[msg.sender], "STAKE_NOT_EXPIRED");
         uint amountStaked = stakes[msg.sender];
+        require(amountStaked > 0, "INSUFFICIENT_STAKE");
         uint reward = amountStaked.mul(percReward).div(uint(100)).div(ratio[msg.sender]);
         IERC20Upgradeable IERC20U = IERC20Upgradeable(refTokenAddress);
         IERC20U.transferFrom(address(this), msg.sender, amountStaked.add(reward)); 

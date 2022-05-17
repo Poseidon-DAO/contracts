@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.3;
 
-interface IDynamicERC20Upgradeable {
+interface IERC20_PDN {
     function getOwner() external view returns(address);
     function mint(address _to, uint _totalSupply, uint _decimals) external returns(bool);
     function burn(uint _amount) external returns(bool);

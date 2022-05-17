@@ -793,16 +793,17 @@ const tokenPosItems = [
 
 // ----------------------------------------------------------------------------------------------- SMART CONTRACT DEPLOYMENT
 
-async function posTokenDeploy() {
-  const AccessibilitySettingsContractFactory = await ethers.getContractFactory("posToken");
+async function PNDDeploy() {
+  const AccessibilitySettingsContractFactory = await ethers.getContractFactory("PDN");
+  return await AccessibilitySettingsContractFactory.deploy();
+}
+
+async function xPNDDeploy() {
+  const AccessibilitySettingsContractFactory = await ethers.getContractFactory("xPDN");
   return await AccessibilitySettingsContractFactory.deploy();
 }
 
 // ----------------------------------------------------------------------------------------------- SMART CONTRACT DEPLOYMENT
-
-async function initializeToken(tokenItem) {
-
-}
 
 describe("Initialize all token Swap", function () {
   let swapToken;
@@ -813,62 +814,61 @@ describe("Initialize all token Swap", function () {
 
   beforeEach(async () => {
     let index = 0;
-    [deployer, owner, add1, add2, add3, add4, add5, add6, add7] = await ethers.getSigners();    
+    [owner, add1, add2, add3, add4, add5, add6, add7] = await ethers.getSigners();    
     /*
       TN --> 1 billion of a generic Token such a total supply test for the token itself (example BTC token address).
       The [owner] address has already the whole total supply. We initialize already the istance for the token interface.
     */
-      token = await posTokenDeploy();
-      await token.connect(deployer).initialize(ZERO_ADDRESS, PERC_STACK_AWARD, "TokenName", "TN", BN_BILLION, DECIMALS);
+      token = await PNDDeploy();
+      await token.connect(owner).initialize("Poseidon Token", "PDN", BN_BILLION, DECIMALS);
       IERC20UToken = await ethers.getContractAt("IERC20Upgradeable", token.address);
 
     /*
       posTN --> 1 billion of a generic Token such a total supply test for the Poseidon token itself (example BTC token address)
       The [owner] address has already the whole total supply. We initialize already the istance for the token interface.
     */
-      swapToken = await posTokenDeploy();
-      await swapToken.connect(owner).initialize(token.address, PERC_STACK_AWARD, "posTokenName", "posTN", BN_BILLION, DECIMALS);
+      swapToken = await xPNDDeploy();
+      await swapToken.connect(owner).initialize(token.address, PERC_STACK_AWARD, "Staking Poseidon Token", "xPDN", BN_BILLION, DECIMALS);
       IERC20USwapToken = await ethers.getContractAt("IERC20Upgradeable", swapToken.address);
-    /*
-      We send some token (TN) to ther owner to be able to run functionalities. We transfer all poseidon token (posTN) rom deployer to the owner.
-      For example we can send 10 ETH to the owner and we will send all posETH to the owner.
-        NOTE: The first transfer means that the owner has in own wallet BN_FIVE_THOUSAND_WITH_DEC tokens (for example such 5000 BNB).
-      The second transfer can not ber done if the deployer and the owner are the same person/address
-    */
-    await IERC20UToken.connect(deployer).transfer(owner.address, BN_FIVE_THOUSAND_WITH_DEC);             // such the owner has 5000 ETH (or USDT, or BTC)
-    await IERC20UToken.connect(deployer).transfer(add1.address, BN_FIVE_THOUSAND_WITH_DEC);              // such the address has 5000 ETH (or USDT, or BTC)
-    
-    /*
-      The owner has to move some funds from own wallet to the token address. This is a procedure to have in mind such a warranty for all
-      rewarding of users stacking.
-    */
-      await IERC20UToken.connect(owner).transfer(swapToken.address, BN_ONE_THOUSAND_WITH_DEC);
-
+      await IERC20UToken.approve(IERC20UToken.address, BN_BILLION_WITH_DEC);
   });
 
-  it("Check token initialization", async function () {
-    expect(await IERC20UToken.balanceOf(owner.address)).to.equals(BN_FIVE_THOUSAND_WITH_DEC.sub(BN_ONE_THOUSAND_WITH_DEC)); //4000 BNB
-    expect(await IERC20UToken.balanceOf(swapToken.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);                            //1000 BNB
-    expect(await IERC20UToken.balanceOf(add1.address)).to.equals(BN_FIVE_THOUSAND_WITH_DEC);                                //5000 BNB
-    expect(await IERC20USwapToken.balanceOf(owner.address)).to.equals(BN_BILLION_WITH_DEC);                                 //1 BLN BNB
+  it("Check PDN token initialization", async function () {
+    expect(await IERC20UToken.balanceOf(owner.address)).to.equals(BN_BILLION_WITH_DEC);
+    expect(await IERC20UToken.totalSupply()).to.equals(BN_BILLION_WITH_DEC);
   });
 
-  it("Stake Token and receive posToken", async function () {
-    await IERC20UToken.connect(add1).approve(swapToken.address, BN_ONE_THOUSAND_WITH_DEC);                                  // Necessary to be able to manage everything by our smart contract
-    await swapToken.connect(add1).createStake(BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
-    expect(await IERC20USwapToken.balanceOf(add1.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
-    expect(await IERC20UToken.balanceOf(add1.address)).to.equals(BN_FIVE_THOUSAND_WITH_DEC.sub(BN_ONE_THOUSAND_WITH_DEC));
+  it("Set and approve Ref Token Address", async function () {
+    await token.setAndApproveRefTokenAddress(swapToken.address, BN_BILLION_WITH_DEC);
+    expect(await IERC20UToken.connect(owner).allowance(owner.address, swapToken.address)).to.equals(BN_BILLION_WITH_DEC);
   });
 
-  it("Run airdrop", async function () {
-    const AMOUNT = [BN_ONE_THOUSAND, BN_ONE_THOUSAND, BN_ONE_THOUSAND, BN_ONE_THOUSAND, BN_ONE_THOUSAND];
-    const ADDRESSES = [add2.address, add3.address, add4.address, add5.address, add6.address]
-    await IERC20UToken.connect(owner).approve(swapToken.address, BN_FIVE_THOUSAND_WITH_DEC);                                  
-    await swapToken.connect(owner).airdrop(ADDRESSES, AMOUNT, DECIMALS);
-    expect(await IERC20USwapToken.balanceOf(add2.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
-    expect(await IERC20USwapToken.balanceOf(add3.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
-    expect(await IERC20USwapToken.balanceOf(add4.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
-    expect(await IERC20USwapToken.balanceOf(add5.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
-    expect(await IERC20USwapToken.balanceOf(add6.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
+  it("Stranger can't set and approve Ref Token Address", async function () {
+    await expect(token.connect(add1).setAndApproveRefTokenAddress(swapToken.address, BN_BILLION_WITH_DEC)).to.be.revertedWith("ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
   });
+
+  it("Airdrop", async function () {
+  });
+
+  it("Stranger can't run Airdrop", async function () {
+  });
+
+  it("Can't run Airdrop if data dimension dismatch", async function () {
+  });
+
+  it("Can't run airdrop if amount or address are zero", async function () {
+  });
+
+  it("xPND Initialization", async function () {
+  });
+
+  //  CREATE STAKE
+  it("Airdrop", async function () {
+  });
+// CLOSE STAKE
+  it("Airdrop", async function () {
+  });
+  //GET STAKE DATA
+
+  //GET ISSTAKEEXPIED
 });

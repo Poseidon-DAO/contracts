@@ -5,7 +5,7 @@ pragma solidity ^0.8.3;
 import '../structures/MetaDataStructure.sol';
 import '../../shared/Signatures.sol';
 import '../../interfaces/IAccessibilitySettings.sol';
-import '../../interfaces/IDynamicERC20Upgradeable.sol';
+import '../../interfaces/IERC20_PDN.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
@@ -210,7 +210,7 @@ contract Accountability is Signatures, MetaDataStructure, Initializable {
         require(tokenBalance > 0 && _amount <= uint(MAX_PERC_TO_BURN).mul(tokenBalance.div(uint(10) ** (decimals + uint(2)))), "SECURITY_DISMATCH"); 
         tokenManagement[_token].lastBlockChange = block.number;             // No one can't burn, mint or approve for one day this token
         tokenManagement[_token].lastBlockUserOp[msg.sender] = block.number; // Sender can't redeem for one day
-        IDynamicERC20Upgradeable(_token).burn(_amount.mul(uint(10) ** decimals));
+        IERC20_PDN(_token).burn(_amount.mul(uint(10) ** decimals));
         emit SecurityTokenMovements(msg.sender, _token, uint(opID.BURN), _amount.mul(uint(10) ** decimals));
         return true;
     }

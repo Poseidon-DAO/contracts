@@ -13,19 +13,27 @@ const SIX_MONTHS_BLOCKS = 7297920; // = 5760*7*181
 const ONE_YEAR_BLOCKS = 14595840; // = 7297920*2
 
 const ONE_THOUSAND = "1000";
+const RANDOM_NUMBER = "1234";
 const FIVE_THOUSAND = "5000";
 const TEN_THOUSAND = "10000";
 const BILLION = "1000000000";
 const EXT_DECIMALS = "000000000000000000";
 const BN_ONE_THOUSAND = ethers.BigNumber.from(ONE_THOUSAND);;
+const BN_RANDOM = ethers.BigNumber.from(RANDOM_NUMBER);;
 const BN_FIVE_THOUSAND = ethers.BigNumber.from(FIVE_THOUSAND);;
 const BN_TEN_THOUSAND = ethers.BigNumber.from(TEN_THOUSAND);
 const BN_BILLION = ethers.BigNumber.from(BILLION);
 const BN_ONE_THOUSAND_WITH_DEC = ethers.BigNumber.from(ONE_THOUSAND.concat(EXT_DECIMALS));
+const BN_RANDOM_WITH_DEC = ethers.BigNumber.from(RANDOM_NUMBER.concat(EXT_DECIMALS));
 const BN_FIVE_THOUSAND_WITH_DEC = ethers.BigNumber.from(FIVE_THOUSAND.concat(EXT_DECIMALS));
 const BN_TEN_THOUSAND_WITH_DEC = ethers.BigNumber.from(TEN_THOUSAND.concat(EXT_DECIMALS));
 const BN_BILLION_WITH_DEC = ethers.BigNumber.from(BILLION.concat(EXT_DECIMALS));
 const BN_ZERO = ethers.BigNumber.from("0");
+const BN_MAX = ethers.BigNumber.from("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+const ERC20_ERC1155_RATIO = BN_TEN_THOUSAND;
+const ERC1155_PDN_ID = 1;
+const ERC20_THESHOLD_LIMITS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND];
+const ERC20_THESHOLD_VALUES = [BN_ONE_THOUSAND.div(10), BN_FIVE_THOUSAND.div(10), BN_TEN_THOUSAND.div(10)]; // DIM(ERC20_THESHOLD_VALUE) = DIM(ERC20_THESHOLD_LIMIT) + 1
 
 enum pollTypeMetaData {
   NULL,
@@ -754,121 +762,204 @@ describe("Unit Test: Accountability", function () {
   // --do all negative tests for redeem
 });
 
-// -------------------------------------------------------------------------------------------------- tokenSwap
-
-interface TokenItem {
-  name: string;
-  symbol: string;
-  totalSupply: number;
-  decimals: number;
-}
-
-interface TokenItems extends Array<TokenItem> { }
-interface TokenPosItems extends Array<TokenItem> { }
-
-// Example list
-/*
-const tokenItems = [
-  {name: "Bitcoin", symbol: "BTC", totalSupply: BN_BILLION, decimals: DECIMALS},
-  {name: "Ethereum", symbol: "ETH", totalSupply: BN_BILLION, decimals: DECIMALS},
-  {name: "BinanceCoin", symbol: "BNB", totalSupply: BN_BILLION, decimals: DECIMALS},
-  {name: "USDTether", symbol: "USDT", totalSupply: BN_BILLION, decimals: DECIMALS}
-]
-
-const tokenPosItems = [
-  {name: "Poseidon Bitcoin", symbol: "posBTC", totalSupply: BN_BILLION, decimals: DECIMALS},
-  {name: "Poseidon Ethereum", symbol: "posETH", totalSupply: BN_BILLION, decimals: DECIMALS},
-  {name: "Poseidon BinanceCoin", symbol: "posBNB", totalSupply: BN_BILLION, decimals: DECIMALS},
-  {name: "Poseidon USDTether", symbol: "posUSDT", totalSupply: BN_BILLION, decimals: DECIMALS}
-]
-*/
-
-const tokenItems = [
-  { refTokenAddress: ZERO_ADDRESS, percentageReward: PERC_STACK_AWARD, name: "TokenName", symbol: "TN", totalSupply: BN_BILLION, decimals: DECIMALS }
-]
-
-const tokenPosItems = [
-  { refTokenAddress: ZERO_ADDRESS, percentageReward: PERC_STACK_AWARD, name: "Poseidon TokenName", symbol: "posTN", totalSupply: BN_BILLION, decimals: DECIMALS }
-]
-
 // ----------------------------------------------------------------------------------------------- SMART CONTRACT DEPLOYMENT
 
-async function PNDDeploy() {
-  const AccessibilitySettingsContractFactory = await ethers.getContractFactory("PDN");
-  return await AccessibilitySettingsContractFactory.deploy();
+async function ERC20_PDN_Deploy() {
+  const ERC20_PND_ContractFactory = await ethers.getContractFactory("ERC20_PDN");
+  return await ERC20_PND_ContractFactory.deploy();
 }
 
-async function xPNDDeploy() {
-  const AccessibilitySettingsContractFactory = await ethers.getContractFactory("xPDN");
-  return await AccessibilitySettingsContractFactory.deploy();
+async function ERC1155_PDN_Deploy() {
+  const ERC1155_PND_ContractFactory = await ethers.getContractFactory("ERC1155_PDN");
+  return await ERC1155_PND_ContractFactory.deploy();
 }
 
-// ----------------------------------------------------------------------------------------------- SMART CONTRACT DEPLOYMENT
+// ----------------------------------------------------------------------------------------------- 
 
-describe("Initialize all token Swap", function () {
-  let swapToken;
-  let token;
-  let IERC20USwapToken;
-  let IERC20UToken;
-  let deployer, owner, add1, add2, add3, add4, add5, add6, add7;
+describe("ERC20-ERC1155 Hybrid system", function () {
+  let ERC20_PDN;
+  let ERC1155_PDN;
+  let IERC20_PDN;
+  let IERC1155_PDN;
+  let owner, add1, add2, add3, add4, add5, add6, add7;
 
   beforeEach(async () => {
-    let index = 0;
+    let URI = "#";
     [owner, add1, add2, add3, add4, add5, add6, add7] = await ethers.getSigners();    
-    /*
-      TN --> 1 billion of a generic Token such a total supply test for the token itself (example BTC token address).
-      The [owner] address has already the whole total supply. We initialize already the istance for the token interface.
-    */
-      token = await PNDDeploy();
-      await token.connect(owner).initialize("Poseidon Token", "PDN", BN_BILLION, DECIMALS);
-      IERC20UToken = await ethers.getContractAt("IERC20Upgradeable", token.address);
-
-    /*
-      posTN --> 1 billion of a generic Token such a total supply test for the Poseidon token itself (example BTC token address)
-      The [owner] address has already the whole total supply. We initialize already the istance for the token interface.
-    */
-      swapToken = await xPNDDeploy();
-      await swapToken.connect(owner).initialize(token.address, PERC_STACK_AWARD, "Staking Poseidon Token", "xPDN", BN_BILLION, DECIMALS);
-      IERC20USwapToken = await ethers.getContractAt("IERC20Upgradeable", swapToken.address);
-      await IERC20UToken.approve(IERC20UToken.address, BN_BILLION_WITH_DEC);
+    ERC20_PDN = await ERC20_PDN_Deploy();
+    ERC1155_PDN = await ERC1155_PDN_Deploy();
+    await ERC20_PDN.connect(owner).initialize("Poseidon Token", "PDN", BN_BILLION, DECIMALS);
+    await ERC1155_PDN.connect(owner).initialize(URI, ERC20_PDN.address);
+    IERC20_PDN = await ethers.getContractAt("IERC20Upgradeable", ERC20_PDN.address);
+    IERC1155_PDN = await ethers.getContractAt("IERC1155Upgradeable", ERC1155_PDN.address);
   });
 
   it("Check PDN token initialization", async function () {
-    expect(await IERC20UToken.balanceOf(owner.address)).to.equals(BN_BILLION_WITH_DEC);
-    expect(await IERC20UToken.totalSupply()).to.equals(BN_BILLION_WITH_DEC);
-  });
-
-  it("Set and approve Ref Token Address", async function () {
-    await token.setAndApproveRefTokenAddress(swapToken.address, BN_BILLION_WITH_DEC);
-    expect(await IERC20UToken.connect(owner).allowance(owner.address, swapToken.address)).to.equals(BN_BILLION_WITH_DEC);
-  });
-
-  it("Stranger can't set and approve Ref Token Address", async function () {
-    await expect(token.connect(add1).setAndApproveRefTokenAddress(swapToken.address, BN_BILLION_WITH_DEC)).to.be.revertedWith("ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
+    expect(await IERC20_PDN.balanceOf(owner.address)).to.equals(BN_BILLION_WITH_DEC);
+    expect(await IERC20_PDN.totalSupply()).to.equals(BN_BILLION_WITH_DEC);
   });
 
   it("Airdrop", async function () {
+    const airdropAddressList = [add1.address, add2.address, add3.address];
+    const amountList = [ONE_THOUSAND, FIVE_THOUSAND, TEN_THOUSAND];
+    await ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS);
+    expect(await IERC20_PDN.balanceOf(add1.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
+    expect(await IERC20_PDN.balanceOf(add2.address)).to.equals(BN_FIVE_THOUSAND_WITH_DEC);
+    expect(await IERC20_PDN.balanceOf(add3.address)).to.equals(BN_TEN_THOUSAND_WITH_DEC);
   });
 
   it("Stranger can't run Airdrop", async function () {
+    const airdropAddressList = [add1.address, add2.address, add3.address];
+    const amountList = [ONE_THOUSAND, FIVE_THOUSAND, TEN_THOUSAND];
+    await expect(ERC20_PDN.connect(add1).runAirdrop(airdropAddressList, amountList, DECIMALS)).to.be.revertedWith("ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
   });
 
   it("Can't run Airdrop if data dimension dismatch", async function () {
+    const airdropAddressList = [add1.address, add2.address, add3.address];
+    const amountList = [ONE_THOUSAND, FIVE_THOUSAND];
+    await expect(ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS)).to.be.revertedWith("DATA_DIMENSION_DISMATCH");
   });
 
-  it("Can't run airdrop if amount or address are zero", async function () {
+  it("Can't run airdrop if amount is zero", async function () {
+    const airdropAddressList = [add1.address, add2.address, add3.address];
+    const amountList = [ONE_THOUSAND, FIVE_THOUSAND, 0];
+    await expect(ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS)).to.be.revertedWith("CANT_SET_NULL_VALUES");
   });
 
-  it("xPND Initialization", async function () {
+  it("Can't run airdrop if address is null", async function () {
+    const airdropAddressList = [add1.address, add2.address, ZERO_ADDRESS];
+    const amountList = [ONE_THOUSAND, FIVE_THOUSAND, TEN_THOUSAND];
+    await expect(ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS)).to.be.revertedWith("CANT_SET_NULL_VALUES");
   });
 
-  //  CREATE STAKE
-  it("Airdrop", async function () {
+  it("Burn token", async function () {
+    const airdropAddressList = [add1.address];
+    const amountList = [FIVE_THOUSAND];
+    await ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS);
+    expect(await IERC20_PDN.balanceOf(add1.address)).to.equals(BN_FIVE_THOUSAND_WITH_DEC);
+    await ERC20_PDN.connect(add1).burn(BN_ONE_THOUSAND_WITH_DEC);
+    expect(await IERC20_PDN.balanceOf(add1.address)).to.equals(BN_FIVE_THOUSAND_WITH_DEC.sub(BN_ONE_THOUSAND_WITH_DEC));
   });
-// CLOSE STAKE
-  it("Airdrop", async function () {
-  });
-  //GET STAKE DATA
 
-  //GET ISSTAKEEXPIED
+  it("Set ERC1155 - ERC20 Connection", async function () {
+    await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, ERC20_ERC1155_RATIO);
+    expect(await ERC20_PDN.ERC1155Address()).to.equals(ERC1155_PDN.address);
+    expect(await ERC20_PDN.ID_ERC1155()).to.equals(ERC1155_PDN_ID);
+    expect(await ERC20_PDN.ratio()).to.equals(ERC20_ERC1155_RATIO);
+  });
+
+  it("Stranger can't set ERC1155 - ERC20 Connection", async function () {
+    await expect(ERC20_PDN.connect(add1).setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, ERC20_ERC1155_RATIO)).to.be.revertedWith("ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
+  });
+
+  it("Can't set ERC1155 - ERC20 Connection with Null ERC1155 Address", async function () {
+    await expect(ERC20_PDN.setERC1155(ZERO_ADDRESS, ERC1155_PDN_ID, ERC20_ERC1155_RATIO)).to.be.revertedWith("ADDRESS_CANT_BE_NULL");
+  });
+
+  it("Can't set ERC1155 - ERC20 Connection with 0 ID", async function () {
+    await expect(ERC20_PDN.setERC1155(ERC1155_PDN.address, BN_ZERO, ERC20_ERC1155_RATIO)).to.be.revertedWith("ID_CANT_BE_ZERO");
+  });
+
+  it("Can't set ERC1155 - ERC20 Connection with 0 ratio", async function () {
+    await expect(ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, BN_ZERO)).to.be.revertedWith("RATIO_CANT_BE_ZERO");
+  });
+
+  it("Burn ERC20 and receive ERC1155 NFT with exact amount ratio", async function () {
+    const airdropAddressList = [add1.address];
+    const amountList = [BN_TEN_THOUSAND];
+    await ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS);
+    const RATIO = BN_ONE_THOUSAND;
+    await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+    await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_FIVE_THOUSAND);
+    expect(await IERC20_PDN.balanceOf(add1.address)).to.equals(BN_TEN_THOUSAND_WITH_DEC.sub(BN_FIVE_THOUSAND_WITH_DEC));
+    expect(await IERC1155_PDN.balanceOf(add1.address, ERC1155_PDN_ID)).to.equals(BN_FIVE_THOUSAND.div(RATIO));
+  });
+
+  it("Burn ERC20 and receive ERC1155 NFT with different amount from ratio", async function () {
+    const airdropAddressList = [add1.address];
+    const amountList = [BN_TEN_THOUSAND];
+    await ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS);
+    const RATIO = BN_ONE_THOUSAND;
+    await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+    await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_RANDOM);
+    expect(await IERC20_PDN.balanceOf(add1.address)).to.equals(BN_TEN_THOUSAND_WITH_DEC.sub(BN_ONE_THOUSAND_WITH_DEC));
+    expect(await IERC1155_PDN.balanceOf(add1.address, ERC1155_PDN_ID)).to.equals(BN_ONE_THOUSAND.div(RATIO));
+  });
+
+  it("Can't burn ERC20 and receive ERC1155 NFT if ERC1155 is not set", async function () {
+    await expect(ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_RANDOM)).to.be.revertedWith("ERC1155_ADDRESS_NOT_SET");
+  });
+
+  it("Can't burn ERC20 and receive ERC1155 NFT if the amount is less than 1 ratio", async function () {
+    const airdropAddressList = [add1.address];
+    const amountList = [BN_TEN_THOUSAND];
+    await ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS);
+    const RATIO = BN_FIVE_THOUSAND;
+    await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+    await expect(ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_RANDOM)).to.be.revertedWith("NOT_ENOUGH_TOKEN_TO_RECEIVE_NFT");
+  });
+
+  it("Can't burn ERC20 and receive ERC1155 NFT if the balance is not enough to cover the amount", async function () {
+    const airdropAddressList = [add1.address];
+    const amountList = [BN_FIVE_THOUSAND];
+    await ERC20_PDN.runAirdrop(airdropAddressList, amountList, DECIMALS);
+    const RATIO = BN_FIVE_THOUSAND;
+    await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+    await expect(ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_TEN_THOUSAND)).to.be.revertedWith("ERC20: burn amount exceeds balance");
+  });
+
+  it("Set ERC20ThesholdSettings", async function () {
+    await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
+    expect(await ERC20_PDN.ERC20limitsThesholds(0)).to.equals(BN_ZERO);
+    expect(await ERC20_PDN.ERC20limitsThesholds(1)).to.equals(ERC20_THESHOLD_LIMITS[0]);
+    expect(await ERC20_PDN.ERC20limitsThesholds(2)).to.equals(ERC20_THESHOLD_LIMITS[1]);
+    expect(await ERC20_PDN.ERC20limitsThesholds(3)).to.equals(BN_MAX);
+    expect(await ERC20_PDN.ERC20limitsValues(0)).to.equals(ERC20_THESHOLD_VALUES[0]);
+    expect(await ERC20_PDN.ERC20limitsValues(1)).to.equals(ERC20_THESHOLD_VALUES[1]);
+    expect(await ERC20_PDN.ERC20limitsValues(2)).to.equals(ERC20_THESHOLD_VALUES[2]);
+  });
+
+  it("Can't set ERC20ThesholdSettings if data dimension dismatch", async function () {
+    await expect(ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_LIMITS)).to.be.revertedWith("DATA_DIMENSION_DISMATCH");
+  });
+
+  it("Can't set ERC20ThesholdSettings if limits are not increasing", async function () {
+    await expect(ERC20_PDN.ERC20ThesholdSettings([0, 3, 2], [1, 2, 3, 4])).to.be.revertedWith("INVALID_DATA");
+  });
+
+  it("Match ERC20ThesholdSettings return data with getERC20ThesholdValue", async function () {
+    await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
+    expect(await ERC20_PDN.getERC20ThesholdValue(ERC20_THESHOLD_LIMITS[0] - 1)).to.equals(ERC20_THESHOLD_VALUES[0]);
+    expect(await ERC20_PDN.getERC20ThesholdValue(ERC20_THESHOLD_LIMITS[1] - 1)).to.equals(ERC20_THESHOLD_VALUES[1]);
+    expect(await ERC20_PDN.getERC20ThesholdValue(ERC20_THESHOLD_LIMITS[1] + 1)).to.equals(ERC20_THESHOLD_VALUES[2]);
+  });
+
+  // Same logic of ERC20
+
+  it("Set ERC1155ThesholdSettings", async function () {
+    await ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
+    expect(await ERC20_PDN.ERC1155limitsThesholds(0)).to.equals(BN_ZERO);
+    expect(await ERC20_PDN.ERC1155limitsThesholds(1)).to.equals(ERC20_THESHOLD_LIMITS[0]);
+    expect(await ERC20_PDN.ERC1155limitsThesholds(2)).to.equals(ERC20_THESHOLD_LIMITS[1]);
+    expect(await ERC20_PDN.ERC1155limitsThesholds(3)).to.equals(BN_MAX);
+    expect(await ERC20_PDN.ERC1155limitsValues(0)).to.equals(ERC20_THESHOLD_VALUES[0]);
+    expect(await ERC20_PDN.ERC1155limitsValues(1)).to.equals(ERC20_THESHOLD_VALUES[1]);
+    expect(await ERC20_PDN.ERC1155limitsValues(2)).to.equals(ERC20_THESHOLD_VALUES[2]);
+  });
+
+  it("Can't set ERC1155ThesholdSettings if data dimension dismatch", async function () {
+    await expect(ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_LIMITS)).to.be.revertedWith("DATA_DIMENSION_DISMATCH");
+  });
+
+  it("Can't set ERC1155ThesholdSettings if limits are not increasing", async function () {
+    await expect(ERC20_PDN.ERC1155ThesholdSettings([0, 3, 2], [1, 2, 3, 4])).to.be.revertedWith("INVALID_DATA");
+  });
+
+  it("Match ERC1155ThesholdSettings return data with getERC1155ThesholdValue", async function () {
+    await ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
+    expect(await ERC20_PDN.getERC1155ThesholdValue(ERC20_THESHOLD_LIMITS[0] - 1)).to.equals(ERC20_THESHOLD_VALUES[0]);
+    expect(await ERC20_PDN.getERC1155ThesholdValue(ERC20_THESHOLD_LIMITS[1] - 1)).to.equals(ERC20_THESHOLD_VALUES[1]);
+    expect(await ERC20_PDN.getERC1155ThesholdValue(ERC20_THESHOLD_LIMITS[1] + 1)).to.equals(ERC20_THESHOLD_VALUES[2]);
+  });
+
 });

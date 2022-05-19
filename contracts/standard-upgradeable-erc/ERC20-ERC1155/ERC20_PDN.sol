@@ -5,7 +5,7 @@ pragma solidity ^0.8.3;
 import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol'; 
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155Upgradeable.sol';
-import '../../interfaces/IERC1155_PDN.sol';
+import './../../interfaces/IERC1155_PDN.sol';
 
 contract ERC20_PDN is ERC20Upgradeable { 
 
@@ -22,6 +22,9 @@ contract ERC20_PDN is ERC20Upgradeable {
     uint[] public ERC1155limitsThesholds;
     uint[] public ERC1155limitsValues;
 
+    bool ERC20SettingsChangeStatus;
+    bool ERC1155SettingsChangeStatus;
+    
     modifier onlyOwner {
         require(owner == msg.sender, "ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
         _;
@@ -51,17 +54,23 @@ contract ERC20_PDN is ERC20Upgradeable {
     }
  
     function burnAndReceiveNFT(uint _amount) public returns(bool){
+        address tmpERC1155Address = ERC1155Address;
+        require(tmpERC1155Address != address(0), "ERC1155_ADDRESS_NOT_SET");
         uint tmpRatio = ratio;
         uint NFTAmount = _amount.div(tmpRatio);
         require(balanceOf(msg.sender).div(tmpRatio) >= NFTAmount && NFTAmount > uint(0), "NOT_ENOUGH_TOKEN_TO_RECEIVE_NFT");
-        _burn(msg.sender, _amount);
-        IERC1155_PDN(ERC1155Address).mint(msg.sender, NFTAmount, ID_ERC1155, 0);
+        _burn(msg.sender, NFTAmount.mul(ratio).mul(10 ** decimals()));
+        IERC1155_PDN IERC1155_PDN_Interface = IERC1155_PDN(ERC1155Address);
+        IERC1155_PDN_Interface.mint(msg.sender, ID_ERC1155, NFTAmount, bytes("0"));
         return true;
     }
 
     // ERC20-ERC1155 Connection settings
 
     function setERC1155(address _ERC1155Address, uint _ID_ERC1155, uint _ratio) public onlyOwner returns(bool){
+        require(_ERC1155Address != address(0), "ADDRESS_CANT_BE_NULL");
+        require(_ID_ERC1155 > uint(0), "ID_CANT_BE_ZERO");
+        require(_ratio > uint(0), "RATIO_CANT_BE_ZERO");
         ERC1155Address = _ERC1155Address;
         ID_ERC1155 = _ID_ERC1155;
         ratio = _ratio;
@@ -71,31 +80,34 @@ contract ERC20_PDN is ERC20Upgradeable {
     // --------------- ERC20
 
     function ERC20ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner returns(bool){
+        require(!ERC20SettingsChangeStatus, "CANT_CHANGE_STATUS_IF_NOT_REWARDED");
         require(_limits.length.add(uint(1)) == _values.length, "DATA_DIMENSION_DISMATCH");
-        ERC20limitsThesholds = new uint[](_limits.length.add(2));
-        ERC20limitsValues = new uint[](_values.length);
+        ERC20limitsThesholds = new uint[](uint(0));
+        ERC20limitsValues = new uint[](uint(0));
         ERC20limitsThesholds.push(uint(0)); // +1 -> Lower limit
         bool isIncreasing = true;
         for(uint index = uint(0); index < _limits.length; index++){
             if(index > uint(0)){
-                if(_limits[index] < _limits[index.add(1)]){
+                if(_limits[index] <= _limits[index.sub(1)]){
                     isIncreasing = false;
                 }
             }
             ERC20limitsThesholds.push(_limits[index]);
+        }
+        ERC20limitsThesholds.push(uint(2 ** 256 - 1)); // +1 -> Upper limit
+        for(uint index = uint(0); index < _values.length; index++){
             ERC20limitsValues.push(_values[index]);
         }
-        ERC20limitsThesholds.push(uint(0)-1); // +1 -> Upper limit
         require(isIncreasing, "INVALID_DATA");
+        ERC20SettingsChangeStatus = true;
         return true;
     }
 
-    function getERC20ThesholdValue() public view returns(uint){
-        uint amount = balanceOf(msg.sender);
+    function getERC20ThesholdValue(uint _amount) public view returns(uint){
         require(ERC20limitsThesholds.length > 0, "POWER_VOTE_SETTINGS_N0T_DEFINED");
         uint result = 0;
         for(uint index = uint(0); index < ERC20limitsThesholds.length.sub(1); index++){
-            if(ERC20limitsThesholds[index] < amount && amount <= ERC20limitsThesholds[index.add(1)]){
+            if(ERC20limitsThesholds[index] < _amount && _amount <= ERC20limitsThesholds[index.add(1)]){
                 result = ERC20limitsValues[index];
             }
         }
@@ -105,30 +117,55 @@ contract ERC20_PDN is ERC20Upgradeable {
     // --------------- ERC1155
 
     function ERC1155ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner returns(bool){
+        require(!ERC1155SettingsChangeStatus, "CANT_CHANGE_STATUS_IF_NOT_REWARDED");
         require(_limits.length.add(uint(1)) == _values.length, "DATA_DIMENSION_DISMATCH");
-        ERC1155limitsThesholds = new uint[](_limits.length.add(2));
-        ERC1155limitsValues = new uint[](_values.length);
+        ERC1155limitsThesholds = new uint[](uint(0));
+        ERC1155limitsValues = new uint[](uint(0));
         ERC1155limitsThesholds.push(uint(0)); // +1 -> Lower limit
+        bool isIncreasing = true;
         for(uint index = uint(0); index < _limits.length; index++){
+            if(index > uint(0)){
+                if(_limits[index] <= _limits[index.sub(1)]){
+                    isIncreasing = false;
+                }
+            }
             ERC1155limitsThesholds.push(_limits[index]);
+        }
+        ERC1155limitsThesholds.push(uint(2 ** 256 - 1)); // +1 -> Upper limit
+        for(uint index = uint(0); index < _values.length; index++){
             ERC1155limitsValues.push(_values[index]);
         }
-        ERC1155limitsThesholds.push(uint(0)-1); // +1 -> Upper limit
+        require(isIncreasing, "INVALID_DATA");
         return true;
     }
 
-    function getERC1155ThesholdValue() public view returns(uint){
-        uint amount = IERC1155Upgradeable(ERC1155Address).balanceOf(msg.sender, ID_ERC1155);
+    function getERC1155ThesholdValue(uint _amount) public view returns(uint){
         require(ERC1155limitsThesholds.length > 0, "POWER_VOTE_SETTINGS_N0T_DEFINED");
         uint result = 0;
         for(uint index = uint(0); index < ERC1155limitsThesholds.length.sub(1); index++){
-            if(ERC1155limitsThesholds[index] < amount && amount <= ERC1155limitsThesholds[index.add(1)]){
+            if(ERC1155limitsThesholds[index] < _amount && _amount <= ERC1155limitsThesholds[index.add(1)]){
                 result = ERC1155limitsValues[index];
             }
         }
         return result;
     }
 
-    // ---------------- NFT rewarding
+    function batchRewarding(address[] memory _addresses) public returns(bool){
+        require(_addresses.length > 0, "NOT_ENOUGH_ADDRESSES");
+        address tmpOwnerAddress = owner;
+        require(msg.sender == tmpOwnerAddress, "ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
+        uint amount;
+        uint tmpID_ERC1155 = ID_ERC1155;
+        address tmpERC1155_Address = ERC1155Address;
+        for(uint index = 0; index < _addresses.length; index++){
+            require(_addresses[index] != address(0), "CANT_REWARD_NULL_ADDRESS");
+            amount = getERC20ThesholdValue(balanceOf(_addresses[index])).add(getERC1155ThesholdValue(IERC1155Upgradeable(tmpERC1155_Address).balanceOf(_addresses[index], tmpID_ERC1155)));
+            _burn(tmpOwnerAddress, amount);
+            _mint(_addresses[index], amount);
+        }
+        ERC20SettingsChangeStatus = false;
+        ERC1155SettingsChangeStatus = false;
+        return true;
+    }
 
 }

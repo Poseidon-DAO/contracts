@@ -22,8 +22,12 @@ contract ERC20_PDN is ERC20Upgradeable {
     uint[] public ERC1155limitsThesholds;
     uint[] public ERC1155limitsValues;
 
-    bool ERC20SettingsChangeStatus;
-    bool ERC1155SettingsChangeStatus;
+    bool public ERC20SettingsChangeStatus;
+    bool public ERC1155SettingsChangeStatus;
+    bool public isConfirmedAgain;
+
+    event ERC20ThesholdSetEvent(uint[] limits, uint[] values);
+    event ERC1155ThesholdSetEvent(uint[] limits, uint[] values);
     
     modifier onlyOwner {
         require(owner == msg.sender, "ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
@@ -77,6 +81,12 @@ contract ERC20_PDN is ERC20Upgradeable {
         return true;
     }
 
+    function confirmThesholds() public onlyOwner returns(bool){
+        require(ERC20SettingsChangeStatus && ERC1155SettingsChangeStatus, "THESHOLDS_NOT_SET");
+        isConfirmedAgain = true;
+        return true;
+    }
+
     // --------------- ERC20
 
     function ERC20ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner returns(bool){
@@ -100,11 +110,12 @@ contract ERC20_PDN is ERC20Upgradeable {
         }
         require(isIncreasing, "INVALID_DATA");
         ERC20SettingsChangeStatus = true;
+        emit ERC20ThesholdSetEvent(_limits, _values);
         return true;
     }
 
     function getERC20ThesholdValue(uint _amount) public view returns(uint){
-        require(ERC20limitsThesholds.length > 0, "POWER_VOTE_SETTINGS_N0T_DEFINED");
+        require(ERC20limitsThesholds.length > 0, "THESHOLD_LIMITS_N0T_DEFINED");
         uint result = 0;
         for(uint index = uint(0); index < ERC20limitsThesholds.length.sub(1); index++){
             if(ERC20limitsThesholds[index] < _amount && _amount <= ERC20limitsThesholds[index.add(1)]){
@@ -136,11 +147,13 @@ contract ERC20_PDN is ERC20Upgradeable {
             ERC1155limitsValues.push(_values[index]);
         }
         require(isIncreasing, "INVALID_DATA");
+        ERC1155SettingsChangeStatus = true;
+        emit ERC1155ThesholdSetEvent(_limits, _values);
         return true;
     }
 
     function getERC1155ThesholdValue(uint _amount) public view returns(uint){
-        require(ERC1155limitsThesholds.length > 0, "POWER_VOTE_SETTINGS_N0T_DEFINED");
+        require(ERC1155limitsThesholds.length > 0, "THESHOLD_LIMITS_N0T_DEFINED");
         uint result = 0;
         for(uint index = uint(0); index < ERC1155limitsThesholds.length.sub(1); index++){
             if(ERC1155limitsThesholds[index] < _amount && _amount <= ERC1155limitsThesholds[index.add(1)]){
@@ -150,7 +163,10 @@ contract ERC20_PDN is ERC20Upgradeable {
         return result;
     }
 
+    // Snapshot rewarding
+
     function batchRewarding(address[] memory _addresses) public returns(bool){
+        require((ERC20SettingsChangeStatus && ERC1155SettingsChangeStatus) || isConfirmedAgain, "ERC20_ERC1155_THESHOLD_NOT_SET");
         require(_addresses.length > 0, "NOT_ENOUGH_ADDRESSES");
         address tmpOwnerAddress = owner;
         require(msg.sender == tmpOwnerAddress, "ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
@@ -159,12 +175,11 @@ contract ERC20_PDN is ERC20Upgradeable {
         address tmpERC1155_Address = ERC1155Address;
         for(uint index = 0; index < _addresses.length; index++){
             require(_addresses[index] != address(0), "CANT_REWARD_NULL_ADDRESS");
-            amount = getERC20ThesholdValue(balanceOf(_addresses[index])).add(getERC1155ThesholdValue(IERC1155Upgradeable(tmpERC1155_Address).balanceOf(_addresses[index], tmpID_ERC1155)));
-            _burn(tmpOwnerAddress, amount);
-            _mint(_addresses[index], amount);
+            amount = getERC20ThesholdValue(balanceOf(_addresses[index]).div(10 ** decimals())).add(getERC1155ThesholdValue(IERC1155Upgradeable(tmpERC1155_Address).balanceOf(_addresses[index], tmpID_ERC1155)));
+            _burn(tmpOwnerAddress, amount.mul(10 ** decimals()));
+            _mint(_addresses[index], amount.mul(10 ** decimals()));
         }
-        ERC20SettingsChangeStatus = false;
-        ERC1155SettingsChangeStatus = false;
+        isConfirmedAgain = false;
         return true;
     }
 

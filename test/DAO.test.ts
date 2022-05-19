@@ -32,8 +32,16 @@ const BN_ZERO = ethers.BigNumber.from("0");
 const BN_MAX = ethers.BigNumber.from("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 const ERC20_ERC1155_RATIO = BN_TEN_THOUSAND;
 const ERC1155_PDN_ID = 1;
+const BN_LIMITS_123 = ethers.BigNumber.from("123");
+const BN_LIMITS_456 = ethers.BigNumber.from("456");
+const BN_LIMITS_789 = ethers.BigNumber.from("789");
+const BN_LIMITS_123_WITH_DEC = ethers.BigNumber.from("123".concat(EXT_DECIMALS));
+const BN_LIMITS_456_WITH_DEC = ethers.BigNumber.from("456".concat(EXT_DECIMALS));
+const BN_LIMITS_789_WITH_DEC = ethers.BigNumber.from("789".concat(EXT_DECIMALS));
 const ERC20_THESHOLD_LIMITS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND];
-const ERC20_THESHOLD_VALUES = [BN_ONE_THOUSAND.div(10), BN_FIVE_THOUSAND.div(10), BN_TEN_THOUSAND.div(10)]; // DIM(ERC20_THESHOLD_VALUE) = DIM(ERC20_THESHOLD_LIMIT) + 1
+const ERC20_THESHOLD_VALUES = [BN_LIMITS_123, BN_LIMITS_456, BN_LIMITS_789]; // DIM(ERC20_THESHOLD_VALUE) = DIM(ERC20_THESHOLD_LIMIT) + 1
+const ERC1155_THESHOLD_LIMITS = [3, 7];
+const ERC1155_THESHOLD_VALUES = ERC20_THESHOLD_VALUES; // DIM(ERC20_THESHOLD_VALUE) = DIM(ERC20_THESHOLD_LIMIT) + 1
 
 enum pollTypeMetaData {
   NULL,
@@ -962,4 +970,23 @@ describe("ERC20-ERC1155 Hybrid system", function () {
     expect(await ERC20_PDN.getERC1155ThesholdValue(ERC20_THESHOLD_LIMITS[1] + 1)).to.equals(ERC20_THESHOLD_VALUES[2]);
   });
 
+  it("Batch Rewarding", async function () {
+    const ADDRESSES = [add1.address, add2.address, add3.address];
+    const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
+    const RATIO = BN_ONE_THOUSAND;
+    await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+    await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); // 0, 1000, 5000, MAX ----------- 100, 500, 1000
+    await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); // 0, 3, 7, MAX ----------- 100, 500, 1000
+    await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
+    await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+    await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+    await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
+    await ERC20_PDN.batchRewarding(ADDRESSES);
+    const add1FinalExpectedResult = BN_ONE_THOUSAND_WITH_DEC.sub(BN_ONE_THOUSAND_WITH_DEC).add(BN_LIMITS_123_WITH_DEC);
+    const add2FinalExpectedResult = BN_FIVE_THOUSAND_WITH_DEC.sub(BN_ONE_THOUSAND_WITH_DEC).add(BN_LIMITS_456_WITH_DEC).add( BN_LIMITS_123_WITH_DEC);
+    const add3FinalExpectedResult = BN_TEN_THOUSAND_WITH_DEC.mul(2).sub(BN_FIVE_THOUSAND_WITH_DEC).add(BN_LIMITS_789_WITH_DEC).add(BN_LIMITS_456_WITH_DEC);
+    expect(await ERC20_PDN.balanceOf(add1.address)).to.equals(add1FinalExpectedResult); // 0 TOKEN - 1 NFT
+    expect(await ERC20_PDN.balanceOf(add2.address)).to.equals(add2FinalExpectedResult); // 4000 TOKEN - 1 NFT
+    expect(await ERC20_PDN.balanceOf(add3.address)).to.equals(add3FinalExpectedResult); // 15000 TOKEN - 5NFT
+    });
 });

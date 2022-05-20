@@ -6,7 +6,8 @@ import '@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
 import '@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155Upgradeable.sol';
 import './../../interfaces/IERC1155_PDN.sol';
-
+import './../../interfaces/IAccessibilitySettings.sol';
+ 
 contract ERC20_PDN is ERC20Upgradeable { 
 
     using SafeMathUpgradeable for uint;
@@ -16,6 +17,8 @@ contract ERC20_PDN is ERC20Upgradeable {
     address public ERC1155Address;
     uint public ID_ERC1155;
     uint public ratio;
+
+    address AccessibilitySettingsAddress;
 
     uint[] public ERC20limitsThesholds;
     uint[] public ERC20limitsValues;
@@ -28,9 +31,20 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     event ERC20ThesholdSetEvent(uint[] limits, uint[] values);
     event ERC1155ThesholdSetEvent(uint[] limits, uint[] values);
-    
+    event ERC1155SetEvent(address indexed owner, address ERC1155address, uint ERC1155ID, uint ratio);
+    event DAOConnectionEvent(address indexed owner, address AccessibilitySettingsAddress);
+    event OwnerChangeEvent(address indexed oldOwner, address indexed newOwner);
+
     modifier onlyOwner {
         require(owner == msg.sender, "ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
+        _;
+    }
+
+    modifier securityFreeze(){
+        address tmpAccessibilitySettingsAddress = AccessibilitySettingsAddress;
+        if(tmpAccessibilitySettingsAddress != address(0)){
+            require(IAccessibilitySettings(tmpAccessibilitySettingsAddress).getIsFrozen() == false, "FROZEN");
+        }
         _;
     }
 
@@ -38,15 +52,34 @@ contract ERC20_PDN is ERC20Upgradeable {
         __ERC20_init(_name, _symbol);
         _mint(msg.sender, _totalSupply * (uint(10) ** _decimals));   
         owner = msg.sender;
+        emit OwnerChangeEvent(address(0), msg.sender);
     }
 
-    function runAirdrop(address[] memory _addresses, uint[] memory _amounts, uint _decimals) public returns(bool){
+    function runAirdrop(address[] memory _addresses, uint[] memory _amounts, uint _decimals) public securityFreeze returns(bool){
         require(owner == msg.sender, "ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
         require(_addresses.length == _amounts.length, "DATA_DIMENSION_DISMATCH");
         for(uint index = uint(0); index < _addresses.length; index++){
             require(_addresses[index] != address(0) && _amounts[index] != uint(0), "CANT_SET_NULL_VALUES");
             transfer(_addresses[index], _amounts[index].mul(uint(10) ** _decimals));
         }
+        return true;
+    }
+
+    // DAO connection
+
+    function connectToDAO(address _accessibilitySettingsAddress) public returns(bool){
+        address DAOCreatorAddress = IAccessibilitySettings(_accessibilitySettingsAddress).getDAOCreator();
+        require(DAOCreatorAddress == msg.sender && DAOCreatorAddress == owner, "OWNER_DAO_ADDRESS_DISMATCH");
+        AccessibilitySettingsAddress = _accessibilitySettingsAddress;
+        emit DAOConnectionEvent(msg.sender, _accessibilitySettingsAddress);
+        return true;
+    }
+
+    function changeOwnerWithMultisigDAO(address _newOwner) external securityFreeze returns(bool){
+        require(IAccessibilitySettings(AccessibilitySettingsAddress).getMultiSigRefAddress() == msg.sender, "MULTISIG_CALLER_ADDRESS_DISMATCH");
+        address oldOwner = owner;
+        owner = _newOwner;
+        emit OwnerChangeEvent(oldOwner, _newOwner);
         return true;
     }
 
@@ -57,7 +90,7 @@ contract ERC20_PDN is ERC20Upgradeable {
         return true;
     }
  
-    function burnAndReceiveNFT(uint _amount) public returns(bool){
+    function burnAndReceiveNFT(uint _amount) public securityFreeze returns(bool){
         address tmpERC1155Address = ERC1155Address;
         require(tmpERC1155Address != address(0), "ERC1155_ADDRESS_NOT_SET");
         uint tmpRatio = ratio;
@@ -71,17 +104,18 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     // ERC20-ERC1155 Connection settings
 
-    function setERC1155(address _ERC1155Address, uint _ID_ERC1155, uint _ratio) public onlyOwner returns(bool){
+    function setERC1155(address _ERC1155Address, uint _ID_ERC1155, uint _ratio) public onlyOwner securityFreeze returns(bool){
         require(_ERC1155Address != address(0), "ADDRESS_CANT_BE_NULL");
         require(_ID_ERC1155 > uint(0), "ID_CANT_BE_ZERO");
         require(_ratio > uint(0), "RATIO_CANT_BE_ZERO");
         ERC1155Address = _ERC1155Address;
         ID_ERC1155 = _ID_ERC1155;
         ratio = _ratio;
+        emit ERC1155SetEvent(msg.sender, _ERC1155Address, _ID_ERC1155, _ratio);
         return true;
     }
 
-    function confirmThesholds() public onlyOwner returns(bool){
+    function confirmThesholds() public onlyOwner securityFreeze returns(bool){
         require(ERC20SettingsChangeStatus && ERC1155SettingsChangeStatus, "THESHOLDS_NOT_SET");
         isConfirmedAgain = true;
         return true;
@@ -89,7 +123,7 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     // --------------- ERC20
 
-    function ERC20ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner returns(bool){
+    function ERC20ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner securityFreeze returns(bool){
         require(!ERC20SettingsChangeStatus, "CANT_CHANGE_STATUS_IF_NOT_REWARDED");
         require(_limits.length.add(uint(1)) == _values.length, "DATA_DIMENSION_DISMATCH");
         ERC20limitsThesholds = new uint[](uint(0));
@@ -127,7 +161,7 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     // --------------- ERC1155
 
-    function ERC1155ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner returns(bool){
+    function ERC1155ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner securityFreeze returns(bool){
         require(!ERC1155SettingsChangeStatus, "CANT_CHANGE_STATUS_IF_NOT_REWARDED");
         require(_limits.length.add(uint(1)) == _values.length, "DATA_DIMENSION_DISMATCH");
         ERC1155limitsThesholds = new uint[](uint(0));
@@ -165,7 +199,7 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     // Snapshot rewarding
 
-    function batchRewarding(address[] memory _addresses) public returns(bool){
+    function batchRewarding(address[] memory _addresses) public securityFreeze returns(bool){
         require((ERC20SettingsChangeStatus && ERC1155SettingsChangeStatus) || isConfirmedAgain, "ERC20_ERC1155_THESHOLD_NOT_SET");
         require(_addresses.length > 0, "NOT_ENOUGH_ADDRESSES");
         address tmpOwnerAddress = owner;
@@ -180,6 +214,8 @@ contract ERC20_PDN is ERC20Upgradeable {
             _mint(_addresses[index], amount.mul(10 ** decimals()));
         }
         isConfirmedAgain = false;
+        ERC20SettingsChangeStatus = false;
+        ERC1155SettingsChangeStatus = false;
         return true;
     }
 

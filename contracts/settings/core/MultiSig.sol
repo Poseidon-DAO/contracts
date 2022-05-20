@@ -25,7 +25,8 @@ contract MultiSig is Initializable{
         CHANGE_CREATOR,
         DELETE_ADDRESS_ON_MULTISIG_LIST,
         ADD_ADDRESS_ON_MULTISIG_LIST,
-        UNFREEZE
+        UNFREEZE,
+        CHANGE_PDN_SMARTCONTRACT_OWNER
     }
 
     mapping(address => bool) public multiSigDAO;

@@ -10,13 +10,7 @@ contract ERC1155_PDN is ERC1155Upgradeable {
     using SafeMathUpgradeable for uint;
     
     address public owner;
-
     address public ERC20Address;
-
-    modifier onlyOwner {
-        require(owner == msg.sender, "ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
-        _;
-    }
 
     function initialize(string memory _uri, address _ERC20Address) initializer public {
         __ERC1155_init(_uri);
@@ -30,14 +24,14 @@ contract ERC1155_PDN is ERC1155Upgradeable {
         return(true);
     }
 
-    //to check (why I can't override it?)
-    function safeTransferFrom() public virtual {
-        revert();
+    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes memory data) public virtual override {
+        require(false, "FUNCTION_OVERRIDE_TRANSFER_NOT_ALLOWED");
+        _safeTransferFrom(from, to, id, amount, data);                  // unreachable code
     }
 
-    //to check (why I can't override it?)
-    function safeBatchTransferFrom() public virtual {
-        revert();
+    function safeBatchTransferFrom(address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data) public virtual override {
+        require(false, "FUNCTION_OVERRIDE_TRANSFER_BATCH_NOT_ALLOWED");
+        _safeBatchTransferFrom(from, to, ids, amounts, data);           // unreachable code
     }
     
 }

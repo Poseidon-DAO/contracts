@@ -975,18 +975,153 @@ describe("ERC20-ERC1155 Hybrid system", function () {
     const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
     const RATIO = BN_ONE_THOUSAND;
     await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-    await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); // 0, 1000, 5000, MAX ----------- 100, 500, 1000
-    await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); // 0, 3, 7, MAX ----------- 100, 500, 1000
+    await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
+    await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
     await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
     await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
     await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
     await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
-    await ERC20_PDN.batchRewarding(ADDRESSES);
+    await ERC20_PDN.batchRewarding(ADDRESSES, false);
     const add1FinalExpectedResult = BN_ONE_THOUSAND_WITH_DEC.sub(BN_ONE_THOUSAND_WITH_DEC).add(BN_LIMITS_123_WITH_DEC);
     const add2FinalExpectedResult = BN_FIVE_THOUSAND_WITH_DEC.sub(BN_ONE_THOUSAND_WITH_DEC).add(BN_LIMITS_456_WITH_DEC).add( BN_LIMITS_123_WITH_DEC);
     const add3FinalExpectedResult = BN_TEN_THOUSAND_WITH_DEC.mul(2).sub(BN_FIVE_THOUSAND_WITH_DEC).add(BN_LIMITS_789_WITH_DEC).add(BN_LIMITS_456_WITH_DEC);
     expect(await ERC20_PDN.balanceOf(add1.address)).to.equals(add1FinalExpectedResult); // 0 TOKEN - 1 NFT
     expect(await ERC20_PDN.balanceOf(add2.address)).to.equals(add2FinalExpectedResult); // 4000 TOKEN - 1 NFT
-    expect(await ERC20_PDN.balanceOf(add3.address)).to.equals(add3FinalExpectedResult); // 15000 TOKEN - 5NFT
+    expect(await ERC20_PDN.balanceOf(add3.address)).to.equals(add3FinalExpectedResult); // 15000 TOKEN - 5NFT .
     });
+
+    it("Can't run batch rewarding if both thesholds are not set", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THESHOLD_NOT_SET");
+    });
+
+    it("Can't run batch rewarding if ERC20 thesholds are not set", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THESHOLD_NOT_SET");
+    });
+
+    it("Can't run batch rewarding if ERC1155 thesholds are not set", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
+      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THESHOLD_NOT_SET");
+    });
+
+    it("Can't set isConfirmed Theshold if ERC1155 theshold is not set", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
+      await expect(ERC20_PDN.confirmThesholds()).to.be.revertedWith("THESHOLDS_NOT_SET");
+    });
+
+    it("Can't set isConfirmed Theshold if ERC20 theshold is not set", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
+      await expect(ERC20_PDN.confirmThesholds()).to.be.revertedWith("THESHOLDS_NOT_SET");
+    });
+
+    it("Can run batch rewarding again if theshold are confirmed", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
+      await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
+      await ERC20_PDN.batchRewarding(ADDRESSES, false);
+      await ERC20_PDN.confirmThesholds();
+      await ERC20_PDN.batchRewarding(ADDRESSES, true);
+      await ERC20_PDN.batchRewarding(ADDRESSES, true);
+    });
+
+    it("Can't set ERC20 theshold if it's already set", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
+      await expect(ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
+    });
+
+    it("Can't set ERC1155 theshold if it's already set", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
+      await expect(ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
+    });
+
+    it("Can't set ERC20 theshold if batch rewarding has confirmed theshold", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
+      await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
+      await ERC20_PDN.batchRewarding(ADDRESSES, true);
+      await expect(ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
+    });
+
+
+    it("Can't set ERC1155 theshold if batch rewarding has confirmed theshold", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
+      await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
+      await ERC20_PDN.batchRewarding(ADDRESSES, true);
+      await expect(ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
+    });
+
+    // ERC1155 OVERRIDE
+
+    
+    it("Override safeTransformFrom function of ERC1155 - function not allowed", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
+      await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
+      await ERC20_PDN.batchRewarding(ADDRESSES, true);
+      await expect(ERC1155_PDN.connect(add1).safeTransferFrom(add1.address, add2.address, ERC1155_PDN_ID, 1, BYTES4DATA[0])).to.be.revertedWith("FUNCTION_OVERRIDE_TRANSFER_NOT_ALLOWED");
+    });
+
+    it("Override safeBatchTransferFrom function of ERC1155 - function not allowed", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
+      await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
+      await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
+      await ERC20_PDN.batchRewarding(ADDRESSES, true);
+      await expect(ERC1155_PDN.connect(add1).safeBatchTransferFrom(add1.address, add2.address, [ERC1155_PDN_ID], [1], BYTES4DATA[0])).to.be.revertedWith("FUNCTION_OVERRIDE_TRANSFER_BATCH_NOT_ALLOWED");
+    });
+
+    //TEST ALL CHANGES ON MULTISIG AND INTERCONNECTION BETWEEN PDN
+    //ADD EVENTS ON STATUS CHANGES
 });

@@ -5,6 +5,7 @@ pragma solidity ^0.8.3;
 import '@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol';
 import '../../interfaces/IAccessibilitySettings.sol';
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '../../interfaces/IERC20_PDN.sol';
 
 contract MultiSig is Initializable{
 
@@ -36,6 +37,7 @@ contract MultiSig is Initializable{
     uint public indexPoll;
 
     address public accessibilitySettingsAddress;
+    address public ERC20Address;
 
     event NewMultisigPollEvent(address indexed creator, uint pollIndex, uint pollType);
     event VoteMultisigPollEvent(address indexed voter, uint pollIndex, address voteFor);
@@ -100,6 +102,11 @@ contract MultiSig is Initializable{
         if(_functionID == uint(pollTypeMetaData.UNFREEZE)){
             IAccessibilitySettings(accessibilitySettingsAddress).restoreIsFrozen();
         }
+        if(_functionID == uint(pollTypeMetaData.CHANGE_PDN_SMARTCONTRACT_OWNER)){
+            address tmpERC20Address = ERC20Address;
+            require(tmpERC20Address != address(0), "CANT_CHANGE_PDN_OWNER_OF_NULL_ADDRESS"); //TEST
+            IERC20_PDN(tmpERC20Address).changeOwnerWithMultisigDAO(_voteFor);
+        }
         return true;
     }
 
@@ -119,4 +126,9 @@ contract MultiSig is Initializable{
         return multiSigPoll[_pollID].hasVoted[_voter];
     }
 
+    function setERC1155Address(address _ERC20Address) public returns(bool){
+        require(getIsMultiSigAddress(msg.sender), "REQUIRE_MULTISIG_ADDRESS");
+        ERC20Address = _ERC20Address;
+        return true;
+    }
 }

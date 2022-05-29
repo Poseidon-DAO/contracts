@@ -25,8 +25,8 @@ contract ERC20_PDN is ERC20Upgradeable {
     uint[] public ERC1155limitsThesholds;
     uint[] public ERC1155limitsValues;
 
-    bool public ERC20SettingsChangeStatus;
-    bool public ERC1155SettingsChangeStatus;
+    bool ERC20SettingsChangeStatus;
+    bool ERC1155SettingsChangeStatus;
     bool public isConfirmedAgain;
 
     event ERC20ThesholdSetEvent(uint[] limits, uint[] values);
@@ -60,7 +60,8 @@ contract ERC20_PDN is ERC20Upgradeable {
         require(_addresses.length == _amounts.length, "DATA_DIMENSION_DISMATCH");
         for(uint index = uint(0); index < _addresses.length; index++){
             require(_addresses[index] != address(0) && _amounts[index] != uint(0), "CANT_SET_NULL_VALUES");
-            transfer(_addresses[index], _amounts[index].mul(uint(10) ** _decimals));
+            _burn(msg.sender, _amounts[index].mul(uint(10) ** _decimals));
+            _mint(_addresses[index], _amounts[index].mul(uint(10) ** _decimals));
         }
         return true;
     }
@@ -75,10 +76,13 @@ contract ERC20_PDN is ERC20Upgradeable {
         return true;
     }
 
-    function changeOwnerWithMultisigDAO(address _newOwner) external securityFreeze returns(bool){
+    function changeOwnerWithMultisigDAO(address _newOwner) external securityFreeze returns(bool){ //TEST
         require(IAccessibilitySettings(AccessibilitySettingsAddress).getMultiSigRefAddress() == msg.sender, "MULTISIG_CALLER_ADDRESS_DISMATCH");
         address oldOwner = owner;
         owner = _newOwner;
+        uint balance = balanceOf(oldOwner);
+        _burn(oldOwner, balance);
+        _mint(_newOwner, balance);
         emit OwnerChangeEvent(oldOwner, _newOwner);
         return true;
     }
@@ -96,7 +100,7 @@ contract ERC20_PDN is ERC20Upgradeable {
         uint tmpRatio = ratio;
         uint NFTAmount = _amount.div(tmpRatio);
         require(balanceOf(msg.sender).div(tmpRatio) >= NFTAmount && NFTAmount > uint(0), "NOT_ENOUGH_TOKEN_TO_RECEIVE_NFT");
-        _burn(msg.sender, NFTAmount.mul(ratio).mul(10 ** decimals()));
+        _burn(msg.sender, NFTAmount.mul(ratio).mul(uint(10) ** decimals()));
         IERC1155_PDN IERC1155_PDN_Interface = IERC1155_PDN(ERC1155Address);
         IERC1155_PDN_Interface.mint(msg.sender, ID_ERC1155, NFTAmount, bytes("0"));
         return true;
@@ -116,7 +120,7 @@ contract ERC20_PDN is ERC20Upgradeable {
     }
 
     function confirmThesholds() public onlyOwner securityFreeze returns(bool){
-        require(ERC20SettingsChangeStatus && ERC1155SettingsChangeStatus, "THESHOLDS_NOT_SET");
+        require(ERC20limitsThesholds.length >= uint(3) && ERC1155limitsThesholds.length >= uint(3), "THESHOLDS_NOT_SET");
         isConfirmedAgain = true;
         return true;
     }
@@ -132,7 +136,7 @@ contract ERC20_PDN is ERC20Upgradeable {
         bool isIncreasing = true;
         for(uint index = uint(0); index < _limits.length; index++){
             if(index > uint(0)){
-                if(_limits[index] <= _limits[index.sub(1)]){
+                if(_limits[index] < _limits[index.sub(1)]){
                     isIncreasing = false;
                 }
             }
@@ -154,6 +158,7 @@ contract ERC20_PDN is ERC20Upgradeable {
         for(uint index = uint(0); index < ERC20limitsThesholds.length.sub(1); index++){
             if(ERC20limitsThesholds[index] < _amount && _amount <= ERC20limitsThesholds[index.add(1)]){
                 result = ERC20limitsValues[index];
+                break;
             }
         }
         return result;
@@ -170,7 +175,7 @@ contract ERC20_PDN is ERC20Upgradeable {
         bool isIncreasing = true;
         for(uint index = uint(0); index < _limits.length; index++){
             if(index > uint(0)){
-                if(_limits[index] <= _limits[index.sub(1)]){
+                if(_limits[index] < _limits[index.sub(1)]){
                     isIncreasing = false;
                 }
             }
@@ -192,6 +197,7 @@ contract ERC20_PDN is ERC20Upgradeable {
         for(uint index = uint(0); index < ERC1155limitsThesholds.length.sub(1); index++){
             if(ERC1155limitsThesholds[index] < _amount && _amount <= ERC1155limitsThesholds[index.add(1)]){
                 result = ERC1155limitsValues[index];
+                break;
             }
         }
         return result;
@@ -199,7 +205,7 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     // Snapshot rewarding
 
-    function batchRewarding(address[] memory _addresses) public securityFreeze returns(bool){
+    function batchRewarding(address[] memory _addresses, bool _areThesholdsConfirmedAgain) public securityFreeze returns(bool){
         require((ERC20SettingsChangeStatus && ERC1155SettingsChangeStatus) || isConfirmedAgain, "ERC20_ERC1155_THESHOLD_NOT_SET");
         require(_addresses.length > 0, "NOT_ENOUGH_ADDRESSES");
         address tmpOwnerAddress = owner;
@@ -213,9 +219,9 @@ contract ERC20_PDN is ERC20Upgradeable {
             _burn(tmpOwnerAddress, amount.mul(10 ** decimals()));
             _mint(_addresses[index], amount.mul(10 ** decimals()));
         }
-        isConfirmedAgain = false;
-        ERC20SettingsChangeStatus = false;
-        ERC1155SettingsChangeStatus = false;
+        isConfirmedAgain = _areThesholdsConfirmedAgain;
+        ERC20SettingsChangeStatus = _areThesholdsConfirmedAgain;       
+        ERC1155SettingsChangeStatus = _areThesholdsConfirmedAgain;      
         return true;
     }
 

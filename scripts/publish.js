@@ -28,7 +28,7 @@ async function main() {
 
     // ACCOUNTABILITY 
 
-    const SECURITY_DELAY = 120;
+    const SECURITY_DELAY = 120; // number of blocks
     const Accountability = await hre.ethers.getContractFactory("Accountability");
     const accountability = await Accountability.deploy();
     await accountability.initialize(accessibilitySettings.address, SECURITY_DELAY);

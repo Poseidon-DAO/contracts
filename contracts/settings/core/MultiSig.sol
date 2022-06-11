@@ -78,6 +78,7 @@ contract MultiSig is Initializable{
         if((voteForCount.add(1)).mul(uint(2)) > multiSigLength){ 
             runMultiSigFunction(multiSigPoll[_pollIndex].pollType, _voteForAddress);
             emit ChangeStatementMultisigPollEvent(_voteForAddress, multiSigPoll[refPollIndex].pollType);
+            multiSigPoll[refPollIndex].pollType = uint(pollTypeMetaData.NULL);
         }
         emit VoteMultisigPollEvent(msg.sender, _pollIndex, _voteForAddress);
         return true;
@@ -124,6 +125,29 @@ contract MultiSig is Initializable{
 
     function getMultiSigPollHasVoted(address _voter, uint _pollID) public view returns(bool){
         return multiSigPoll[_pollID].hasVoted[_voter];
+    }
+
+    function getListOfActivePoll() public view returns(uint[] memory){
+        uint refPollIndex = indexPoll;
+        uint countActive = uint(0);
+        bool[] memory activePolls = new bool[](uint(refPollIndex));
+        for(uint index = uint(0); index < refPollIndex; index++){
+            if(multiSigPoll[refPollIndex].pollType != uint(pollTypeMetaData.NULL)){
+                if((block.number).sub(multiSigPoll[refPollIndex].pollBlockStart) <= N_BLOCK_WEEK){
+                    activePolls[index] = true;
+                    countActive = countActive.add(1);
+                } 
+            }
+        }
+        uint[] memory resultActivePoll = new uint[](uint(countActive));
+        uint tmpIndex = uint(0);
+        for(uint index = uint(0); index < refPollIndex; index++){
+            if(activePolls[index]){
+                resultActivePoll[tmpIndex] = index;
+                tmpIndex = tmpIndex.add(1);
+            }
+        }
+        return resultActivePoll;
     }
 
     function setERC1155Address(address _ERC20Address) public returns(bool){

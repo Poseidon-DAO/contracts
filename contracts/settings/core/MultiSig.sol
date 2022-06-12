@@ -132,8 +132,8 @@ contract MultiSig is Initializable{
         uint countActive = uint(0);
         bool[] memory activePolls = new bool[](uint(refPollIndex));
         for(uint index = uint(0); index < refPollIndex; index++){
-            if(multiSigPoll[refPollIndex].pollType != uint(pollTypeMetaData.NULL)){
-                if((block.number).sub(multiSigPoll[refPollIndex].pollBlockStart) <= N_BLOCK_WEEK){
+            if(multiSigPoll[index].pollType != uint(pollTypeMetaData.NULL)){
+                if((block.number).sub(multiSigPoll[index].pollBlockStart) <= N_BLOCK_WEEK){
                     activePolls[index] = true;
                     countActive = countActive.add(1);
                 } 

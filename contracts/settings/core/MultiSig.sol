@@ -60,7 +60,6 @@ contract MultiSig is Initializable{
             multiSigDAO[_multiSigAddresses[index]] = true;
         }
         multiSigLength = _multiSigAddresses.length;
-        indexPoll = uint(1);
         IAccessibilitySettings(accessibilitySettingsAddress).multiSigInitialize(address(this));
     }
 
@@ -149,8 +148,8 @@ contract MultiSig is Initializable{
         uint countActive = uint(0);
         bool[] memory activePolls = new bool[](uint(refPollIndex));
         for(uint index = uint(0); index < refPollIndex; index++){
-            if(multiSigPoll[index].pollType != uint(pollTypeMetaData.NULL)){
-                if((block.number).sub(multiSigPoll[index].pollBlockStart) <= N_BLOCK_WEEK){
+            if(multiSigPoll[index.add(1)].pollType != uint(pollTypeMetaData.NULL)){
+                if((block.number).sub(multiSigPoll[index.add(1)].pollBlockStart) <= N_BLOCK_WEEK){
                     activePolls[index] = true;
                     countActive = countActive.add(1);
                 } 
@@ -160,7 +159,7 @@ contract MultiSig is Initializable{
         uint tmpIndex = uint(0);
         for(uint index = uint(0); index < refPollIndex; index++){
             if(activePolls[index]){
-                resultActivePoll[tmpIndex] = index;
+                resultActivePoll[tmpIndex] = index.add(1);
                 tmpIndex = tmpIndex.add(1);
             }
         }

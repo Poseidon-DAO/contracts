@@ -38,10 +38,10 @@ const BN_LIMITS_789 = ethers.BigNumber.from("789");
 const BN_LIMITS_123_WITH_DEC = ethers.BigNumber.from("123".concat(EXT_DECIMALS));
 const BN_LIMITS_456_WITH_DEC = ethers.BigNumber.from("456".concat(EXT_DECIMALS));
 const BN_LIMITS_789_WITH_DEC = ethers.BigNumber.from("789".concat(EXT_DECIMALS));
-const ERC20_THESHOLD_LIMITS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND];
-const ERC20_THESHOLD_VALUES = [BN_LIMITS_123, BN_LIMITS_456, BN_LIMITS_789]; // DIM(ERC20_THESHOLD_VALUE) = DIM(ERC20_THESHOLD_LIMIT) + 1
-const ERC1155_THESHOLD_LIMITS = [3, 7];
-const ERC1155_THESHOLD_VALUES = ERC20_THESHOLD_VALUES; // DIM(ERC20_THESHOLD_VALUE) = DIM(ERC20_THESHOLD_LIMIT) + 1
+const ERC20_THrESHOLD_LIMITS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND];
+const ERC20_THrESHOLD_VALUES = [BN_LIMITS_123, BN_LIMITS_456, BN_LIMITS_789]; // DIM(ERC20_THrESHOLD_VALUE) = DIM(ERC20_THrESHOLD_LIMIT) + 1
+const ERC1155_THrESHOLD_LIMITS = [3, 7];
+const ERC1155_THrESHOLD_VALUES = ERC20_THrESHOLD_VALUES; // DIM(ERC20_THrESHOLD_VALUE) = DIM(ERC20_THrESHOLD_LIMIT) + 1
 
 enum pollTypeMetaData {
   NULL,
@@ -53,9 +53,15 @@ enum pollTypeMetaData {
 
 enum multiSigPollStruct {
   POLL_TYPE,
-  POLLBLOCKSTART,
+  POLLBLOCKSTART
   //HASVOTED,
   //VOTERECEIVED
+}
+
+enum vote {
+  NULL,
+  APPROVED,
+  DECLINED
 }
 
 // ----------------------------------------------------------------------------------------------- SMART CONTRACT DEPLOYMENT
@@ -99,18 +105,18 @@ describe("Unit Test: MultiSig", function () {
 
   it("createMultiSigPoll - Can't be run from stranger address", async function () {
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
-    await expect(MultiSig.connect(add1).createMultiSigPoll(pollTypeID)).to.be.revertedWith("NOT_ABLE_TO_CREATE_A_MULTISIG_POLL");
+    await expect(MultiSig.connect(add1).createMultiSigPoll(pollTypeID, add2.address)).to.be.revertedWith("NOT_ABLE_TO_CREATE_A_MULTISIG_POLL");
 
   });
 
   it("createMultiSigPoll - Can't set not valid ID", async function () {
     const pollTypeID = pollTypeMetaData.NULL;
-    await expect(MultiSig.connect(owner).createMultiSigPoll(pollTypeID)).to.be.revertedWith("POLL_ID_DISMATCH");
+    await expect(MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address)).to.be.revertedWith("POLL_ID_DISMATCH");
   });
 
   it("createMultiSigPoll - Change Creator", async function () {
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const events = await MultiSig.queryFilter(MultiSig.filters.NewMultisigPollEvent());
     const lastEvent = events[events.length - 1];
     const pollIndex = await MultiSig.indexPoll();
@@ -121,30 +127,30 @@ describe("Unit Test: MultiSig", function () {
 
   it("voteMultiSigPoll - Can't be run from stranger address", async function () {
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
-    await expect(MultiSig.connect(add1).voteMultiSigPoll(pollIndex, add1.address)).to.be.revertedWith("NOT_ABLE_TO_VOTE_FOR_A_MULTISIG_POLL");
+    await expect(MultiSig.connect(add1).voteMultiSigPoll(pollIndex, vote.APPROVED)).to.be.revertedWith("NOT_ABLE_TO_VOTE_FOR_A_MULTISIG_POLL");
   });
 
   it("voteMultiSigPoll - Can't vote two times for the same poll", async function () {
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
-    await MultiSig.connect(owner).voteMultiSigPoll(pollIndex, add1.address);
-    await expect(MultiSig.connect(owner).voteMultiSigPoll(pollIndex, add1.address)).to.be.revertedWith("ADDRESS_HAS_ALREADY_VOTED");
+    await MultiSig.connect(owner).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await expect(MultiSig.connect(owner).voteMultiSigPoll(pollIndex, vote.APPROVED)).to.be.revertedWith("ADDRESS_HAS_ALREADY_VOTED");
   });
 
   it("voteMultiSigPoll - Vote without actions (<3/5)", async function () {
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
-    const tx = await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add2.address);
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
     const oldOwner = await AccessibilitySettings.getDAOCreator();
     const events = await MultiSig.queryFilter(MultiSig.filters.VoteMultisigPollEvent());
     const lastEvent = events[events.length - 1];
     expect(lastEvent.args.voter).to.equals(add5.address);
     expect(lastEvent.args.pollIndex).to.equals(pollIndex);
-    expect(lastEvent.args.voteFor).to.equals(add2.address);
+    expect(lastEvent.args.vote).to.equals(vote.APPROVED);
     const newOwner = await AccessibilitySettings.getDAOCreator();
     expect(newOwner).to.equals(oldOwner); // NO CHANGES
   });
@@ -152,106 +158,106 @@ describe("Unit Test: MultiSig", function () {
   it("voteMultiSigPoll - Vote with actions (>=3/5) - change DAO creator", async function () {
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     const oldOwner = await AccessibilitySettings.getDAOCreator();
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, add2.address);
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED);
     const newOwner = await AccessibilitySettings.getDAOCreator();
-    expect(newOwner).not.to.equals(oldOwner); //NO CHANGES
+    expect(newOwner).to.equals(add2.address); 
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Can't delete multisig if signature list lenght has minimum requirement", async function () {
     const pollTypeID = pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, owner.address);
     const pollIndex = await MultiSig.indexPoll();
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, owner.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, owner.address);
-    await expect(MultiSig.connect(add7).voteMultiSigPoll(pollIndex, owner.address)).to.be.revertedWith("NOT_ENOUGH_MULTISIG_ADDRESSES");
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await expect(MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED)).to.be.revertedWith("NOT_ENOUGH_MULTISIG_ADDRESSES");
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Add new address on multisig", async function () {
     const pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     const oldAddressIsInMultisig = await MultiSig.multiSigDAO(add2.address);
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, add2.address);
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED);
     const newAddressIsInMultisig = await MultiSig.multiSigDAO(add2.address);
     expect(newAddressIsInMultisig).to.equals(!oldAddressIsInMultisig);
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Can't add new address on multisig if already present", async function () {
     const pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add5.address);
     const pollIndex = await MultiSig.indexPoll();
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add5.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, add5.address);
-    await expect(MultiSig.connect(add7).voteMultiSigPoll(pollIndex, add5.address)).to.be.revertedWith("CANT_ADD_EXISTING_ADDRESS");
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await expect(MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED)).to.be.revertedWith("CANT_ADD_EXISTING_ADDRESS");
 
   });
 
   it("voteMultiSigPoll - Vote with actions - Delete address on multisig", async function () {
     let pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(false);
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     let pollIndex = await MultiSig.indexPoll();
     // Minimum: 3/5
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, add2.address);
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED);
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(true);
     pollTypeID = pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     pollIndex = await MultiSig.indexPoll();
     // Minimum 4/6
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add8).voteMultiSigPoll(pollIndex, add2.address);
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add8).voteMultiSigPoll(pollIndex, vote.APPROVED);
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(false);
   });
 
   it("voteMultiSigPoll - Vote with actions - Can't delete address on multisig if not present", async function () {
     let pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(false);
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     let pollIndex = await MultiSig.indexPoll();
     // Minimum: 3/5
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, add2.address);
-    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, add2.address);
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED);
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(true);
     pollTypeID = pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add3.address);
     pollIndex = await MultiSig.indexPoll();
     // Minimum 4/6
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add3.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, add3.address);
-    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, add3.address);
-    await expect(MultiSig.connect(add8).voteMultiSigPoll(pollIndex, add3.address)).to.be.revertedWith("CANT_DELETE_NOT_EXISTING_ADDRESS");
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await expect(MultiSig.connect(add8).voteMultiSigPoll(pollIndex, vote.APPROVED)).to.be.revertedWith("CANT_DELETE_NOT_EXISTING_ADDRESS");
   });
 
   it("voteMultiSigPoll - Vote with actions - Can't delete address on multisig if minimum we don't have 5 addresses", async function () {
     const pollTypeID = pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add5.address);
     const pollIndex = await MultiSig.indexPoll();
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, add5.address);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, add5.address);
-    await expect(MultiSig.connect(add8).voteMultiSigPoll(pollIndex, add5.address)).to.be.revertedWith("NOT_ENOUGH_MULTISIG_ADDRESSES");
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await expect(MultiSig.connect(add8).voteMultiSigPoll(pollIndex, vote.APPROVED)).to.be.revertedWith("NOT_ENOUGH_MULTISIG_ADDRESSES");
   });
 
   it("voteMultiSigPoll - Vote with actions - Unfreeze", async function () {
     const pollTypeID = pollTypeMetaData.UNFREEZE;
-    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID);
+    await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, ZERO_ADDRESS);
     const pollIndex = await MultiSig.indexPoll();
     expect(await AccessibilitySettings.isFrozen()).to.equals(false);
     await AccessibilitySettings.connect(owner).freeze();
     expect(await AccessibilitySettings.isFrozen()).to.equals(true);
-    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, ZERO_ADDRESS);
-    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, ZERO_ADDRESS);
-    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, ZERO_ADDRESS);
+    await MultiSig.connect(add5).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add6).voteMultiSigPoll(pollIndex, vote.APPROVED);
+    await MultiSig.connect(add7).voteMultiSigPoll(pollIndex, vote.APPROVED);
     expect(await AccessibilitySettings.isFrozen()).to.equals(false);
   });
 });
@@ -916,58 +922,58 @@ describe("ERC20-ERC1155 Hybrid system", function () {
     await expect(ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_TEN_THOUSAND)).to.be.revertedWith("ERC20: burn amount exceeds balance");
   });
 
-  it("Set ERC20ThesholdSettings", async function () {
-    await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
-    expect(await ERC20_PDN.ERC20limitsThesholds(0)).to.equals(BN_ZERO);
-    expect(await ERC20_PDN.ERC20limitsThesholds(1)).to.equals(ERC20_THESHOLD_LIMITS[0]);
-    expect(await ERC20_PDN.ERC20limitsThesholds(2)).to.equals(ERC20_THESHOLD_LIMITS[1]);
-    expect(await ERC20_PDN.ERC20limitsThesholds(3)).to.equals(BN_MAX);
-    expect(await ERC20_PDN.ERC20limitsValues(0)).to.equals(ERC20_THESHOLD_VALUES[0]);
-    expect(await ERC20_PDN.ERC20limitsValues(1)).to.equals(ERC20_THESHOLD_VALUES[1]);
-    expect(await ERC20_PDN.ERC20limitsValues(2)).to.equals(ERC20_THESHOLD_VALUES[2]);
+  it("Set ERC20ThresholdSettings", async function () {
+    await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES);
+    expect(await ERC20_PDN.ERC20limitsThresholds(0)).to.equals(BN_ZERO);
+    expect(await ERC20_PDN.ERC20limitsThresholds(1)).to.equals(ERC20_THrESHOLD_LIMITS[0]);
+    expect(await ERC20_PDN.ERC20limitsThresholds(2)).to.equals(ERC20_THrESHOLD_LIMITS[1]);
+    expect(await ERC20_PDN.ERC20limitsThresholds(3)).to.equals(BN_MAX);
+    expect(await ERC20_PDN.ERC20limitsValues(0)).to.equals(ERC20_THrESHOLD_VALUES[0]);
+    expect(await ERC20_PDN.ERC20limitsValues(1)).to.equals(ERC20_THrESHOLD_VALUES[1]);
+    expect(await ERC20_PDN.ERC20limitsValues(2)).to.equals(ERC20_THrESHOLD_VALUES[2]);
   });
 
-  it("Can't set ERC20ThesholdSettings if data dimension dismatch", async function () {
-    await expect(ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_LIMITS)).to.be.revertedWith("DATA_DIMENSION_DISMATCH");
+  it("Can't set ERC20ThresholdSettings if data dimension dismatch", async function () {
+    await expect(ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_LIMITS)).to.be.revertedWith("DATA_DIMENSION_DISMATCH");
   });
 
-  it("Can't set ERC20ThesholdSettings if limits are not increasing", async function () {
-    await expect(ERC20_PDN.ERC20ThesholdSettings([0, 3, 2], [1, 2, 3, 4])).to.be.revertedWith("INVALID_DATA");
+  it("Can't set ERC20ThresholdSettings if limits are not increasing", async function () {
+    await expect(ERC20_PDN.ERC20ThresholdSettings([0, 3, 2], [1, 2, 3, 4])).to.be.revertedWith("INVALID_DATA");
   });
 
-  it("Match ERC20ThesholdSettings return data with getERC20ThesholdValue", async function () {
-    await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
-    expect(await ERC20_PDN.getERC20ThesholdValue(ERC20_THESHOLD_LIMITS[0] - 1)).to.equals(ERC20_THESHOLD_VALUES[0]);
-    expect(await ERC20_PDN.getERC20ThesholdValue(ERC20_THESHOLD_LIMITS[1] - 1)).to.equals(ERC20_THESHOLD_VALUES[1]);
-    expect(await ERC20_PDN.getERC20ThesholdValue(ERC20_THESHOLD_LIMITS[1] + 1)).to.equals(ERC20_THESHOLD_VALUES[2]);
+  it("Match ERC20ThresholdSettings return data with getERC20ThresholdValue", async function () {
+    await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES);
+    expect(await ERC20_PDN.getERC20ThresholdValue(ERC20_THrESHOLD_LIMITS[0] - 1)).to.equals(ERC20_THrESHOLD_VALUES[0]);
+    expect(await ERC20_PDN.getERC20ThresholdValue(ERC20_THrESHOLD_LIMITS[1] - 1)).to.equals(ERC20_THrESHOLD_VALUES[1]);
+    expect(await ERC20_PDN.getERC20ThresholdValue(ERC20_THrESHOLD_LIMITS[1] + 1)).to.equals(ERC20_THrESHOLD_VALUES[2]);
   });
 
   // Same logic of ERC20
 
-  it("Set ERC1155ThesholdSettings", async function () {
-    await ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
-    expect(await ERC20_PDN.ERC1155limitsThesholds(0)).to.equals(BN_ZERO);
-    expect(await ERC20_PDN.ERC1155limitsThesholds(1)).to.equals(ERC20_THESHOLD_LIMITS[0]);
-    expect(await ERC20_PDN.ERC1155limitsThesholds(2)).to.equals(ERC20_THESHOLD_LIMITS[1]);
-    expect(await ERC20_PDN.ERC1155limitsThesholds(3)).to.equals(BN_MAX);
-    expect(await ERC20_PDN.ERC1155limitsValues(0)).to.equals(ERC20_THESHOLD_VALUES[0]);
-    expect(await ERC20_PDN.ERC1155limitsValues(1)).to.equals(ERC20_THESHOLD_VALUES[1]);
-    expect(await ERC20_PDN.ERC1155limitsValues(2)).to.equals(ERC20_THESHOLD_VALUES[2]);
+  it("Set ERC1155ThresholdSettings", async function () {
+    await ERC20_PDN.ERC1155ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES);
+    expect(await ERC20_PDN.ERC1155limitsThresholds(0)).to.equals(BN_ZERO);
+    expect(await ERC20_PDN.ERC1155limitsThresholds(1)).to.equals(ERC20_THrESHOLD_LIMITS[0]);
+    expect(await ERC20_PDN.ERC1155limitsThresholds(2)).to.equals(ERC20_THrESHOLD_LIMITS[1]);
+    expect(await ERC20_PDN.ERC1155limitsThresholds(3)).to.equals(BN_MAX);
+    expect(await ERC20_PDN.ERC1155limitsValues(0)).to.equals(ERC20_THrESHOLD_VALUES[0]);
+    expect(await ERC20_PDN.ERC1155limitsValues(1)).to.equals(ERC20_THrESHOLD_VALUES[1]);
+    expect(await ERC20_PDN.ERC1155limitsValues(2)).to.equals(ERC20_THrESHOLD_VALUES[2]);
   });
 
-  it("Can't set ERC1155ThesholdSettings if data dimension dismatch", async function () {
-    await expect(ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_LIMITS)).to.be.revertedWith("DATA_DIMENSION_DISMATCH");
+  it("Can't set ERC1155ThresholdSettings if data dimension dismatch", async function () {
+    await expect(ERC20_PDN.ERC1155ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_LIMITS)).to.be.revertedWith("DATA_DIMENSION_DISMATCH");
   });
 
-  it("Can't set ERC1155ThesholdSettings if limits are not increasing", async function () {
-    await expect(ERC20_PDN.ERC1155ThesholdSettings([0, 3, 2], [1, 2, 3, 4])).to.be.revertedWith("INVALID_DATA");
+  it("Can't set ERC1155ThresholdSettings if limits are not increasing", async function () {
+    await expect(ERC20_PDN.ERC1155ThresholdSettings([0, 3, 2], [1, 2, 3, 4])).to.be.revertedWith("INVALID_DATA");
   });
 
-  it("Match ERC1155ThesholdSettings return data with getERC1155ThesholdValue", async function () {
-    await ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
-    expect(await ERC20_PDN.getERC1155ThesholdValue(ERC20_THESHOLD_LIMITS[0] - 1)).to.equals(ERC20_THESHOLD_VALUES[0]);
-    expect(await ERC20_PDN.getERC1155ThesholdValue(ERC20_THESHOLD_LIMITS[1] - 1)).to.equals(ERC20_THESHOLD_VALUES[1]);
-    expect(await ERC20_PDN.getERC1155ThesholdValue(ERC20_THESHOLD_LIMITS[1] + 1)).to.equals(ERC20_THESHOLD_VALUES[2]);
+  it("Match ERC1155ThresholdSettings return data with getERC1155ThresholdValue", async function () {
+    await ERC20_PDN.ERC1155ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES);
+    expect(await ERC20_PDN.getERC1155ThresholdValue(ERC20_THrESHOLD_LIMITS[0] - 1)).to.equals(ERC20_THrESHOLD_VALUES[0]);
+    expect(await ERC20_PDN.getERC1155ThresholdValue(ERC20_THrESHOLD_LIMITS[1] - 1)).to.equals(ERC20_THrESHOLD_VALUES[1]);
+    expect(await ERC20_PDN.getERC1155ThresholdValue(ERC20_THrESHOLD_LIMITS[1] + 1)).to.equals(ERC20_THrESHOLD_VALUES[2]);
   });
 
   it("Batch Rewarding", async function () {
@@ -975,8 +981,8 @@ describe("ERC20-ERC1155 Hybrid system", function () {
     const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
     const RATIO = BN_ONE_THOUSAND;
     await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-    await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
-    await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+    await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES); 
+    await ERC20_PDN.ERC1155ThresholdSettings(ERC1155_THrESHOLD_LIMITS, ERC1155_THrESHOLD_VALUES); 
     await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
     await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
     await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
@@ -990,103 +996,103 @@ describe("ERC20-ERC1155 Hybrid system", function () {
     expect(await ERC20_PDN.balanceOf(add3.address)).to.equals(add3FinalExpectedResult); // 15000 TOKEN - 5NFT .
     });
 
-    it("Can't run batch rewarding if both thesholds are not set", async function () {
+    it("Can't run batch rewarding if both thresholds are not set", async function () {
       const ADDRESSES = [add1.address, add2.address, add3.address];
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THESHOLD_NOT_SET");
+      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THrESHOLD_NOT_SET");
     });
 
-    it("Can't run batch rewarding if ERC20 thesholds are not set", async function () {
+    it("Can't run batch rewarding if ERC20 thresholds are not set", async function () {
       const ADDRESSES = [add1.address, add2.address, add3.address];
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
-      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THESHOLD_NOT_SET");
+      await ERC20_PDN.ERC1155ThresholdSettings(ERC1155_THrESHOLD_LIMITS, ERC1155_THrESHOLD_VALUES); 
+      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THrESHOLD_NOT_SET");
     });
 
-    it("Can't run batch rewarding if ERC1155 thesholds are not set", async function () {
+    it("Can't run batch rewarding if ERC1155 thresholds are not set", async function () {
       const ADDRESSES = [add1.address, add2.address, add3.address];
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
-      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THESHOLD_NOT_SET");
+      await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES);
+      await expect(ERC20_PDN.batchRewarding(ADDRESSES, false)).to.be.revertedWith("ERC20_ERC1155_THrESHOLD_NOT_SET");
     });
 
-    it("Can't set isConfirmed Theshold if ERC1155 theshold is not set", async function () {
+    it("Can't set isConfirmed Threshold if ERC1155 threshold is not set", async function () {
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
-      await expect(ERC20_PDN.confirmThesholds()).to.be.revertedWith("THESHOLDS_NOT_SET");
+      await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES);
+      await expect(ERC20_PDN.confirmThresholds()).to.be.revertedWith("THrESHOLDS_NOT_SET");
     });
 
-    it("Can't set isConfirmed Theshold if ERC20 theshold is not set", async function () {
+    it("Can't set isConfirmed Threshold if ERC20 threshold is not set", async function () {
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES);
-      await expect(ERC20_PDN.confirmThesholds()).to.be.revertedWith("THESHOLDS_NOT_SET");
+      await ERC20_PDN.ERC1155ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES);
+      await expect(ERC20_PDN.confirmThresholds()).to.be.revertedWith("THrESHOLDS_NOT_SET");
     });
 
-    it("Can run batch rewarding again if theshold are confirmed", async function () {
+    it("Can run batch rewarding again if threshold are confirmed", async function () {
       const ADDRESSES = [add1.address, add2.address, add3.address];
       const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
-      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThresholdSettings(ERC1155_THrESHOLD_LIMITS, ERC1155_THrESHOLD_VALUES); 
       await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
       await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
       await ERC20_PDN.batchRewarding(ADDRESSES, false);
-      await ERC20_PDN.confirmThesholds();
+      await ERC20_PDN.confirmThresholds();
       await ERC20_PDN.batchRewarding(ADDRESSES, true);
       await ERC20_PDN.batchRewarding(ADDRESSES, true);
     });
 
-    it("Can't set ERC20 theshold if it's already set", async function () {
+    it("Can't set ERC20 threshold if it's already set", async function () {
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
-      await expect(ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
+      await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES); 
+      await expect(ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
     });
 
-    it("Can't set ERC1155 theshold if it's already set", async function () {
+    it("Can't set ERC1155 threshold if it's already set", async function () {
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
-      await expect(ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
+      await ERC20_PDN.ERC1155ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES); 
+      await expect(ERC20_PDN.ERC1155ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
     });
 
-    it("Can't set ERC20 theshold if batch rewarding has confirmed theshold", async function () {
+    it("Can't set ERC20 threshold if batch rewarding has confirmed threshold", async function () {
       const ADDRESSES = [add1.address, add2.address, add3.address];
       const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
-      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThresholdSettings(ERC1155_THrESHOLD_LIMITS, ERC1155_THrESHOLD_VALUES); 
       await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
       await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
       await ERC20_PDN.batchRewarding(ADDRESSES, true);
-      await expect(ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
+      await expect(ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
     });
 
 
-    it("Can't set ERC1155 theshold if batch rewarding has confirmed theshold", async function () {
+    it("Can't set ERC1155 threshold if batch rewarding has confirmed threshold", async function () {
       const ADDRESSES = [add1.address, add2.address, add3.address];
       const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
-      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThresholdSettings(ERC1155_THrESHOLD_LIMITS, ERC1155_THrESHOLD_VALUES); 
       await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
       await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
       await ERC20_PDN.batchRewarding(ADDRESSES, true);
-      await expect(ERC20_PDN.ERC1155ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
+      await expect(ERC20_PDN.ERC1155ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES)).to.be.revertedWith("CANT_CHANGE_STATUS_IF_NOT_REWARDED");
     });
 
     // ERC1155 OVERRIDE
@@ -1097,8 +1103,8 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
-      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThresholdSettings(ERC1155_THrESHOLD_LIMITS, ERC1155_THrESHOLD_VALUES); 
       await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
       await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
@@ -1112,8 +1118,8 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.ERC20ThesholdSettings(ERC20_THESHOLD_LIMITS, ERC20_THESHOLD_VALUES); 
-      await ERC20_PDN.ERC1155ThesholdSettings(ERC1155_THESHOLD_LIMITS, ERC1155_THESHOLD_VALUES); 
+      await ERC20_PDN.ERC20ThresholdSettings(ERC20_THrESHOLD_LIMITS, ERC20_THrESHOLD_VALUES); 
+      await ERC20_PDN.ERC1155ThresholdSettings(ERC1155_THrESHOLD_LIMITS, ERC1155_THrESHOLD_VALUES); 
       await ERC20_PDN.runAirdrop(ADDRESSES, AMOUNTS, DECIMALS);
       await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 

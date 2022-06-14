@@ -20,17 +20,17 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     address AccessibilitySettingsAddress;
 
-    uint[] public ERC20limitsThesholds;
+    uint[] public ERC20limitsThresholds;
     uint[] public ERC20limitsValues;
-    uint[] public ERC1155limitsThesholds;
+    uint[] public ERC1155limitsThresholds;
     uint[] public ERC1155limitsValues;
 
     bool ERC20SettingsChangeStatus;
     bool ERC1155SettingsChangeStatus;
     bool public isConfirmedAgain;
 
-    event ERC20ThesholdSetEvent(uint[] limits, uint[] values);
-    event ERC1155ThesholdSetEvent(uint[] limits, uint[] values);
+    event ERC20ThresholdSetEvent(uint[] limits, uint[] values);
+    event ERC1155ThresholdSetEvent(uint[] limits, uint[] values);
     event ERC1155SetEvent(address indexed owner, address ERC1155address, uint ERC1155ID, uint ratio);
     event DAOConnectionEvent(address indexed owner, address AccessibilitySettingsAddress);
     event OwnerChangeEvent(address indexed oldOwner, address indexed newOwner);
@@ -119,20 +119,20 @@ contract ERC20_PDN is ERC20Upgradeable {
         return true;
     }
 
-    function confirmThesholds() public onlyOwner securityFreeze returns(bool){
-        require(ERC20limitsThesholds.length >= uint(3) && ERC1155limitsThesholds.length >= uint(3), "THESHOLDS_NOT_SET");
+    function confirmThresholds() public onlyOwner securityFreeze returns(bool){
+        require(ERC20limitsThresholds.length >= uint(3) && ERC1155limitsThresholds.length >= uint(3), "THrESHOLDS_NOT_SET");
         isConfirmedAgain = true;
         return true;
     }
 
     // --------------- ERC20
 
-    function ERC20ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner securityFreeze returns(bool){
+    function ERC20ThresholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner securityFreeze returns(bool){
         require(!ERC20SettingsChangeStatus, "CANT_CHANGE_STATUS_IF_NOT_REWARDED");
         require(_limits.length.add(uint(1)) == _values.length, "DATA_DIMENSION_DISMATCH");
-        ERC20limitsThesholds = new uint[](uint(0));
+        ERC20limitsThresholds = new uint[](uint(0));
         ERC20limitsValues = new uint[](uint(0));
-        ERC20limitsThesholds.push(uint(0)); // +1 -> Lower limit
+        ERC20limitsThresholds.push(uint(0)); // +1 -> Lower limit
         bool isIncreasing = true;
         for(uint index = uint(0); index < _limits.length; index++){
             if(index > uint(0)){
@@ -140,23 +140,23 @@ contract ERC20_PDN is ERC20Upgradeable {
                     isIncreasing = false;
                 }
             }
-            ERC20limitsThesholds.push(_limits[index]);
+            ERC20limitsThresholds.push(_limits[index]);
         }
-        ERC20limitsThesholds.push(uint(2 ** 256 - 1)); // +1 -> Upper limit
+        ERC20limitsThresholds.push(uint(2 ** 256 - 1)); // +1 -> Upper limit
         for(uint index = uint(0); index < _values.length; index++){
             ERC20limitsValues.push(_values[index]);
         }
         require(isIncreasing, "INVALID_DATA");
         ERC20SettingsChangeStatus = true;
-        emit ERC20ThesholdSetEvent(_limits, _values);
+        emit ERC20ThresholdSetEvent(_limits, _values);
         return true;
     }
 
-    function getERC20ThesholdValue(uint _amount) public view returns(uint){
-        require(ERC20limitsThesholds.length > 0, "THESHOLD_LIMITS_N0T_DEFINED");
+    function getERC20ThresholdValue(uint _amount) public view returns(uint){
+        require(ERC20limitsThresholds.length > 0, "THrESHOLD_LIMITS_N0T_DEFINED");
         uint result = 0;
-        for(uint index = uint(0); index < ERC20limitsThesholds.length.sub(1); index++){
-            if(ERC20limitsThesholds[index] < _amount && _amount <= ERC20limitsThesholds[index.add(1)]){
+        for(uint index = uint(0); index < ERC20limitsThresholds.length.sub(1); index++){
+            if(ERC20limitsThresholds[index] < _amount && _amount <= ERC20limitsThresholds[index.add(1)]){
                 result = ERC20limitsValues[index];
                 break;
             }
@@ -166,12 +166,12 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     // --------------- ERC1155
 
-    function ERC1155ThesholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner securityFreeze returns(bool){
+    function ERC1155ThresholdSettings(uint[] memory _limits, uint[] memory _values) public onlyOwner securityFreeze returns(bool){
         require(!ERC1155SettingsChangeStatus, "CANT_CHANGE_STATUS_IF_NOT_REWARDED");
         require(_limits.length.add(uint(1)) == _values.length, "DATA_DIMENSION_DISMATCH");
-        ERC1155limitsThesholds = new uint[](uint(0));
+        ERC1155limitsThresholds = new uint[](uint(0));
         ERC1155limitsValues = new uint[](uint(0));
-        ERC1155limitsThesholds.push(uint(0)); // +1 -> Lower limit
+        ERC1155limitsThresholds.push(uint(0)); // +1 -> Lower limit
         bool isIncreasing = true;
         for(uint index = uint(0); index < _limits.length; index++){
             if(index > uint(0)){
@@ -179,23 +179,23 @@ contract ERC20_PDN is ERC20Upgradeable {
                     isIncreasing = false;
                 }
             }
-            ERC1155limitsThesholds.push(_limits[index]);
+            ERC1155limitsThresholds.push(_limits[index]);
         }
-        ERC1155limitsThesholds.push(uint(2 ** 256 - 1)); // +1 -> Upper limit
+        ERC1155limitsThresholds.push(uint(2 ** 256 - 1)); // +1 -> Upper limit
         for(uint index = uint(0); index < _values.length; index++){
             ERC1155limitsValues.push(_values[index]);
         }
         require(isIncreasing, "INVALID_DATA");
         ERC1155SettingsChangeStatus = true;
-        emit ERC1155ThesholdSetEvent(_limits, _values);
+        emit ERC1155ThresholdSetEvent(_limits, _values);
         return true;
     }
 
-    function getERC1155ThesholdValue(uint _amount) public view returns(uint){
-        require(ERC1155limitsThesholds.length > 0, "THESHOLD_LIMITS_N0T_DEFINED");
+    function getERC1155ThresholdValue(uint _amount) public view returns(uint){
+        require(ERC1155limitsThresholds.length > 0, "THrESHOLD_LIMITS_N0T_DEFINED");
         uint result = 0;
-        for(uint index = uint(0); index < ERC1155limitsThesholds.length.sub(1); index++){
-            if(ERC1155limitsThesholds[index] < _amount && _amount <= ERC1155limitsThesholds[index.add(1)]){
+        for(uint index = uint(0); index < ERC1155limitsThresholds.length.sub(1); index++){
+            if(ERC1155limitsThresholds[index] < _amount && _amount <= ERC1155limitsThresholds[index.add(1)]){
                 result = ERC1155limitsValues[index];
                 break;
             }
@@ -205,8 +205,8 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     // Snapshot rewarding
 
-    function batchRewarding(address[] memory _addresses, bool _areThesholdsConfirmedAgain) public securityFreeze returns(bool){
-        require((ERC20SettingsChangeStatus && ERC1155SettingsChangeStatus) || isConfirmedAgain, "ERC20_ERC1155_THESHOLD_NOT_SET");
+    function batchRewarding(address[] memory _addresses, bool _areThresholdsConfirmedAgain) public securityFreeze returns(bool){
+        require((ERC20SettingsChangeStatus && ERC1155SettingsChangeStatus) || isConfirmedAgain, "ERC20_ERC1155_THrESHOLD_NOT_SET");
         require(_addresses.length > 0, "NOT_ENOUGH_ADDRESSES");
         address tmpOwnerAddress = owner;
         require(msg.sender == tmpOwnerAddress, "ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
@@ -215,13 +215,13 @@ contract ERC20_PDN is ERC20Upgradeable {
         address tmpERC1155_Address = ERC1155Address;
         for(uint index = 0; index < _addresses.length; index++){
             require(_addresses[index] != address(0), "CANT_REWARD_NULL_ADDRESS");
-            amount = getERC20ThesholdValue(balanceOf(_addresses[index]).div(10 ** decimals())).add(getERC1155ThesholdValue(IERC1155Upgradeable(tmpERC1155_Address).balanceOf(_addresses[index], tmpID_ERC1155)));
+            amount = getERC20ThresholdValue(balanceOf(_addresses[index]).div(10 ** decimals())).add(getERC1155ThresholdValue(IERC1155Upgradeable(tmpERC1155_Address).balanceOf(_addresses[index], tmpID_ERC1155)));
             _burn(tmpOwnerAddress, amount.mul(10 ** decimals()));
             _mint(_addresses[index], amount.mul(10 ** decimals()));
         }
-        isConfirmedAgain = _areThesholdsConfirmedAgain;
-        ERC20SettingsChangeStatus = _areThesholdsConfirmedAgain;       
-        ERC1155SettingsChangeStatus = _areThesholdsConfirmedAgain;      
+        isConfirmedAgain = _areThresholdsConfirmedAgain;
+        ERC20SettingsChangeStatus = _areThresholdsConfirmedAgain;       
+        ERC1155SettingsChangeStatus = _areThresholdsConfirmedAgain;      
         return true;
     }
 

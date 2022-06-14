@@ -45,8 +45,7 @@ contract ERC20_PDN is ERC20Upgradeable {
         if(tmpAccessibilitySettingsAddress != address(0)){
             require(IAccessibilitySettings(tmpAccessibilitySettingsAddress).getIsFrozen() == false, "FROZEN");
         }
-        _;
-    }
+        _;    }
 
     function initialize(string memory _name, string memory _symbol, uint _totalSupply, uint _decimals) initializer public {
         __ERC20_init(_name, _symbol);

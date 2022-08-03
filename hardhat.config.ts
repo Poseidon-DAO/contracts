@@ -7,7 +7,7 @@ import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "@nomiclabs/hardhat-etherscan";
 import "hardhat-abi-exporter";
-
+import "@nomiclabs/hardhat-web3";
 // TODO: reenable solidity-coverage when it works
 // import "solidity-coverage";
 const mocha = require("./mocha-config");
@@ -24,7 +24,7 @@ const config: HardhatUserConfig = {
     // compilers: [{ version: "0.4.18", settings: {} }],
     // compilers: [{ version: "0.5.0", settings: {} }],
     // compilers: [{ version: "0.7.6", settings: {} }],
-    compilers: [{ version: "0.8.0", settings: {} }],
+    compilers: [{ version: "0.8.0"}, {version: "0.8.1"}, {version: "0.8.3", settings: {} }],
   },
   abiExporter: {
     path: './abi',
@@ -49,22 +49,6 @@ const config: HardhatUserConfig = {
         initialIndex: 0,
         count: 10
       }
-    },
-    live: {
-      url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: [PRIVATE_KEY],
-    },
-    rinkeby: {
-      url: `https://rinkeby.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: [PRIVATE_KEY],
-    },
-    ropsten: {
-      url: `https://ropsten.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: [PRIVATE_KEY],
-    },
-    kovan: {
-      url: `https://kovan.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: [PRIVATE_KEY],
     },
     coverage: {
       url: "http://127.0.0.1:8555", // Coverage launches its own ganache-cli client

@@ -122,9 +122,7 @@ contract ERC20_PDN is ERC20Upgradeable {
     // Vesting System
 
     function addVest(address _address, uint _amount, uint _duration) public onlyOwner returns(bool){
-        //uint DAY = uint(5760);
         uint tmpOwnerLock = ownerLock;
-        //require(_duration == DAY.mul(uint(182)) || _duration == DAY.mul(uint(365)),"DURATION_DISMATCH");
         require(vestList[_address].amount == uint(0), "VEST_ALREADY_SET");
         require(balanceOf(owner).sub(tmpOwnerLock) >= _amount, "INSUFFICIENT_OWNER_BALANCE");
         vestList[_address].amount = _amount;

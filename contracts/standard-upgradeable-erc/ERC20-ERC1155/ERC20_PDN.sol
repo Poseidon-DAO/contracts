@@ -124,6 +124,7 @@ contract ERC20_PDN is ERC20Upgradeable {
     function addVest(address _address, uint _amount, uint _duration) public onlyOwner returns(bool){
         uint tmpOwnerLock = ownerLock;
         require(vestList[_address].amount == uint(0), "VEST_ALREADY_SET");
+        require(_duration >= uint(5760), "INSUFFICIENT DURATION");
         require(balanceOf(owner).sub(tmpOwnerLock) >= _amount, "INSUFFICIENT_OWNER_BALANCE");
         vestList[_address].amount = _amount;
         vestList[_address].expirationDate = uint(block.number).add(_duration);
@@ -145,5 +146,11 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     function getVestMetaData(address _address) public view returns(uint, uint){
         return (vestList[_address].amount, vestList[_address].expirationDate);
+    }
+
+    function deleteVest(address _address) public returns(bool){
+        require(IAccessibilitySettings(AccessibilitySettingsAddress).getMultiSigRefAddress() == msg.sender, "MULTISIG_CALLER_ADDRESS_DISMATCH");
+        delete vestList[_address];
+        return true;
     }
 }

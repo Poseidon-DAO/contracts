@@ -28,7 +28,8 @@ contract MultiSig is Initializable{
         DELETE_ADDRESS_ON_MULTISIG_LIST,
         ADD_ADDRESS_ON_MULTISIG_LIST,
         UNFREEZE,
-        CHANGE_PDN_SMARTCONTRACT_OWNER
+        CHANGE_PDN_SMARTCONTRACT_OWNER,
+        DELETE_PDN_VEST
     }
 
     enum voteMetaData {
@@ -117,8 +118,13 @@ contract MultiSig is Initializable{
         }
         if(_functionID == uint(pollTypeMetaData.CHANGE_PDN_SMARTCONTRACT_OWNER)){
             address tmpERC20Address = ERC20Address;
-            require(tmpERC20Address != address(0), "CANT_CHANGE_PDN_OWNER_OF_NULL_ADDRESS"); //TEST
+            require(tmpERC20Address != address(0), "CANT_CHANGE_PDN_OWNER_OF_NULL_ADDRESS"); 
             IERC20_PDN(tmpERC20Address).changeOwnerWithMultisigDAO(_voteFor);
+        }
+        if(_functionID == uint(pollTypeMetaData.DELETE_PDN_VEST)){
+            address tmpERC20Address = ERC20Address;
+            require(tmpERC20Address != address(0), "ERC20_ADDRESS_NOT_SET");
+            IERC20_PDN(tmpERC20Address).deleteVest(_voteFor);
         }
         return true;
     }

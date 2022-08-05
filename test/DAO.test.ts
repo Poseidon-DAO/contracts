@@ -9,8 +9,8 @@ const BYTES4DATA = [Web3Utils.toHex('A1B2'), Web3Utils.toHex('B2C3')];
 const SECURITY_DELAY = 10;
 const DECIMALS = 18;
 const PERC_STACK_AWARD = 10;
-const SIX_MONTHS_BLOCKS = 7297920; // = 5760*7*181
-const ONE_YEAR_BLOCKS = 14595840; // = 7297920*2
+const SIX_MONTHS_BLOCKS = 1048320;
+const ONE_YEAR_BLOCKS = 2096640; 
 
 const ONE_THOUSAND = "1000";
 const RANDOM_NUMBER = "1234";
@@ -78,7 +78,7 @@ async function multiSigDeploy() {
 
 async function dynamicERC20UpgradeableDeploy() {
   const DynamicERC20UpgradeableContractFactory = await ethers.getContractFactory("DynamicERC20Upgradeable");
-  return await DynamicERC20UpgradeableContractFactory.deploy();
+  return await DynamicERC20UpgradeableContractFactory.deploy();BN_BILLION_WITH_DEC
 }
 
 async function accountabilityDeploy() {
@@ -944,6 +944,60 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       await expect(ERC1155_PDN.connect(add1).safeBatchTransferFrom(add1.address, add2.address, [ERC1155_PDN_ID], [1], BYTES4DATA[0])).to.be.revertedWith("FUNCTION_OVERRIDE_TRANSFER_BATCH_NOT_ALLOWED");
     });
 
+    // Vesting test
+
+    it("Add Vest", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      const tx = await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
+      const vestMetaData = await ERC20_PDN.getVestMetaData(add1.address);
+      await expect(vestMetaData[0]).to.equals(BN_ONE_THOUSAND_WITH_DEC);
+      await expect(vestMetaData[1]).to.equals(ethers.BigNumber.from(tx.blockNumber).add(SIX_MONTHS_BLOCKS));
+    });
+
+    it("Can't Add Vest if it is already set", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
+      await expect(ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS)).to.be.revertedWith("VEST_ALREADY_SET");
+    });
+
+    it("Can't Add Vest if owner balance is not sufficient", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_BILLION_WITH_DEC, SIX_MONTHS_BLOCKS);
+      await expect(ERC20_PDN.connect(owner).addVest(add2.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS)).to.be.revertedWith("INSUFFICIENT_OWNER_BALANCE");
+    });
+
+    it("Withdraw Vest", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      const DURATION = 5;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION);
+      for (let index = 0; index < DURATION; index++) { await ethers.provider.send("evm_mine"); }
+      await ERC20_PDN.connect(add1).withdrawVest();
+      const vestMetaData = await ERC20_PDN.getVestMetaData(add1.address);
+      await expect(vestMetaData[0]).to.equals(0);
+      await expect(vestMetaData[1]).to.equals(0);
+      expect(await ERC20_PDN.balanceOf(add1.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
+    });
+
+    it("Can't Withdraw Vest if not set", async function () {
+      await expect(ERC20_PDN.connect(add1).withdrawVest()).to.be.revertedWith("VEST_NOT_SET");
+    });
+
+    it("Can't Withdraw Vest if not expired", async function () {
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
+      await expect(ERC20_PDN.connect(add1).withdrawVest()).to.be.revertedWith("VEST_NOT_EXPIRED");
+    });
+
+    
+    it("Can't Run withdraw if locked amount is greater than amounts requests", async function () {
+      const ADDRESSES = [add1.address, add2.address, add3.address];
+      const AMOUNTS = [BN_ONE_THOUSAND, BN_FIVE_THOUSAND, BN_TEN_THOUSAND.mul(2)];
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_BILLION_WITH_DEC, SIX_MONTHS_BLOCKS);
+      await expect(ERC20_PDN.connect(owner).runAirdrop(ADDRESSES, AMOUNTS, 18)).to.be.revertedWith("INSUFFICIENT_OWNER_BALANCE");
+    });
     //TEST ALL CHANGES ON MULTISIG AND INTERCONNECTION BETWEEN PDN
     //ADD EVENTS ON STATUS CHANGES
 });

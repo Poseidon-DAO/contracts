@@ -19,7 +19,9 @@ const MNEMONIC = process.env.MNEMONIC || "";
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
-  mocha,
+  mocha: {
+    timeout: 100000000000
+  },
   solidity: {
     // compilers: [{ version: "0.4.18", settings: {} }],
     // compilers: [{ version: "0.5.0", settings: {} }],

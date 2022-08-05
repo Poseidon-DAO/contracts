@@ -17,12 +17,22 @@ contract ERC20_PDN is ERC20Upgradeable {
     address public ERC1155Address;
     uint public ID_ERC1155;
     uint public ratio;
+    uint public ownerLock;
+
+    struct vest {
+        uint amount;
+        uint expirationDate;
+    }
+
+    mapping(address => vest) vestList;
 
     address AccessibilitySettingsAddress;
 
     event ERC1155SetEvent(address indexed owner, address ERC1155address, uint ERC1155ID, uint ratio);
     event DAOConnectionEvent(address indexed owner, address AccessibilitySettingsAddress);
     event OwnerChangeEvent(address indexed oldOwner, address indexed newOwner);
+    event AddVestEvent(address to, uint amount, uint duration);
+    event WithdrawVestEvent(address receiver, uint amount);
 
     modifier onlyOwner {
         require(owner == msg.sender, "ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
@@ -47,10 +57,12 @@ contract ERC20_PDN is ERC20Upgradeable {
     function runAirdrop(address[] memory _addresses, uint[] memory _amounts, uint _decimals) public securityFreeze returns(bool){
         require(owner == msg.sender, "ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
         require(_addresses.length == _amounts.length, "DATA_DIMENSION_DISMATCH");
+        uint availableOwnerBalance = balanceOf(msg.sender).sub(ownerLock);
         for(uint index = uint(0); index < _addresses.length; index++){
             require(_addresses[index] != address(0) && _amounts[index] != uint(0), "CANT_SET_NULL_VALUES");
-            _burn(msg.sender, _amounts[index].mul(uint(10) ** _decimals));
-            _mint(_addresses[index], _amounts[index].mul(uint(10) ** _decimals));
+            require(availableOwnerBalance >= _amounts[index], "INSUFFICIENT_OWNER_BALANCE");
+            availableOwnerBalance = availableOwnerBalance.sub(_amounts[index]);
+            _transfer(msg.sender, _addresses[index], _amounts[index].mul(uint(10) ** _decimals));
         }
         return true;
     }
@@ -70,8 +82,7 @@ contract ERC20_PDN is ERC20Upgradeable {
         address oldOwner = owner;
         owner = _newOwner;
         uint balance = balanceOf(oldOwner);
-        _burn(oldOwner, balance);
-        _mint(_newOwner, balance);
+        _transfer(oldOwner, _newOwner, balance);
         emit OwnerChangeEvent(oldOwner, _newOwner);
         return true;
     }
@@ -108,4 +119,33 @@ contract ERC20_PDN is ERC20Upgradeable {
         return true;
     }
 
+    // Vesting System
+
+    function addVest(address _address, uint _amount, uint _duration) public onlyOwner returns(bool){
+        //uint DAY = uint(5760);
+        uint tmpOwnerLock = ownerLock;
+        //require(_duration == DAY.mul(uint(182)) || _duration == DAY.mul(uint(365)),"DURATION_DISMATCH");
+        require(vestList[_address].amount == uint(0), "VEST_ALREADY_SET");
+        require(balanceOf(owner).sub(tmpOwnerLock) >= _amount, "INSUFFICIENT_OWNER_BALANCE");
+        vestList[_address].amount = _amount;
+        vestList[_address].expirationDate = uint(block.number).add(_duration);
+        ownerLock = tmpOwnerLock.add(_amount);
+        emit AddVestEvent(_address, _amount, _duration);
+        return true;
+    }
+
+    function withdrawVest() public returns(bool){
+        uint vestAmount = vestList[msg.sender].amount;
+        require(vestAmount > uint(0), "VEST_NOT_SET");
+        require(vestList[msg.sender].expirationDate < block.number, "VEST_NOT_EXPIRED");
+        delete vestList[msg.sender];
+        ownerLock = ownerLock.sub(vestAmount);
+        _transfer(owner, msg.sender, vestAmount);
+        emit WithdrawVestEvent(msg.sender, vestAmount);
+        return true;
+    }
+
+    function getVestMetaData(address _address) public view returns(uint, uint){
+        return (vestList[_address].amount, vestList[_address].expirationDate);
+    }
 }

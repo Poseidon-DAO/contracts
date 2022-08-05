@@ -953,6 +953,28 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       const vestMetaData = await ERC20_PDN.getVestMetaData(add1.address);
       await expect(vestMetaData[0]).to.equals(BN_ONE_THOUSAND_WITH_DEC);
       await expect(vestMetaData[1]).to.equals(ethers.BigNumber.from(tx.blockNumber).add(SIX_MONTHS_BLOCKS));
+      expect (await ERC20_PDN.ownerLock()).to.equals(ethers.BigNumber.from(BN_ONE_THOUSAND_WITH_DEC));
+    });
+
+    it("Owner lock amount is the sum of single vests", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
+      await ERC20_PDN.connect(owner).addVest(add2.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
+      expect (await ERC20_PDN.ownerLock()).to.equals(ethers.BigNumber.from(BN_ONE_THOUSAND_WITH_DEC).mul(2));
+    });
+
+    it("Owner lock amount is restored after withdraw", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      const DURATION = 5;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION);
+      await ERC20_PDN.connect(owner).addVest(add2.address, BN_ONE_THOUSAND_WITH_DEC, DURATION);
+      for (let index = 0; index < DURATION; index++) { await ethers.provider.send("evm_mine"); }
+      await ERC20_PDN.connect(add1).withdrawVest();
+      expect (await ERC20_PDN.ownerLock()).to.equals(ethers.BigNumber.from(BN_ONE_THOUSAND_WITH_DEC));
+      await ERC20_PDN.connect(add2).withdrawVest();
+      expect (await ERC20_PDN.ownerLock()).to.equals(ethers.BigNumber.from(0));
     });
 
     it("Can't Add Vest if it is already set", async function () {
@@ -990,7 +1012,6 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
       await expect(ERC20_PDN.connect(add1).withdrawVest()).to.be.revertedWith("VEST_NOT_EXPIRED");
     });
-
     
     it("Can't Run withdraw if locked amount is greater than amounts requests", async function () {
       const ADDRESSES = [add1.address, add2.address, add3.address];
@@ -998,6 +1019,6 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       await ERC20_PDN.connect(owner).addVest(add1.address, BN_BILLION_WITH_DEC, SIX_MONTHS_BLOCKS);
       await expect(ERC20_PDN.connect(owner).runAirdrop(ADDRESSES, AMOUNTS, 18)).to.be.revertedWith("INSUFFICIENT_OWNER_BALANCE");
     });
-    //TEST ALL CHANGES ON MULTISIG AND INTERCONNECTION BETWEEN PDN
-    //ADD EVENTS ON STATUS CHANGES
+
+
 });

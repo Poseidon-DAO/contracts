@@ -216,7 +216,7 @@ contract AccessibilitySettings is Initializable {
     *       - freezeEvent
     */
 
-    function multiSigInitialize(address _multiSigRefAddress) public isSuperAdmin returns(bool){
+    function multiSigInitialize(address _multiSigRefAddress) public returns(bool){
         require(!multiSigInitilized, "MULTISIG_ALREADY_INITIALIZED");
         multiSigRefAddress = _multiSigRefAddress;
         multiSigInitilized = true;

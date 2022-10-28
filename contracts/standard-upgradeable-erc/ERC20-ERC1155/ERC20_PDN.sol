@@ -27,21 +27,21 @@ contract ERC20_PDN is ERC20Upgradeable {
     uint public ID_ERC1155;
     uint public ratio;
     uint public ownerLock;
+    address AccessibilitySettingsAddress;
 
     struct vest {
         uint amount;
         uint expirationDate;
     }
 
-    mapping(address => vest) vestList;
+    mapping(address => vest[]) vestList;
 
-    address AccessibilitySettingsAddress;
 
     event ERC1155SetEvent(address indexed owner, address ERC1155address, uint ERC1155ID, uint ratio);
     event DAOConnectionEvent(address indexed owner, address AccessibilitySettingsAddress);
     event OwnerChangeEvent(address indexed oldOwner, address indexed newOwner);
     event AddVestEvent(address to, uint amount, uint duration);
-    event WithdrawVestEvent(address receiver, uint amount);
+    event WithdrawVestEvent(uint vestIndex, address receiver, uint amount);
 
     /*
     * @dev: This modifier allows function to be run only from the owner of the smart contract itself.
@@ -106,8 +106,7 @@ contract ERC20_PDN is ERC20Upgradeable {
     *       - _transfer: standard ERC20 transfer event for each address and amount specified above
     */
 
-    function runAirdrop(address[] memory _addresses, uint[] memory _amounts, uint _decimals) public securityFreeze returns(bool){
-        require(owner == msg.sender, "ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
+    function runAirdrop(address[] memory _addresses, uint[] memory _amounts, uint _decimals) public securityFreeze onlyOwner returns(bool){
         require(_addresses.length == _amounts.length, "DATA_DIMENSION_DISMATCH");
         uint availableOwnerBalance = balanceOf(msg.sender).sub(ownerLock);
         for(uint index = uint(0); index < _addresses.length; index++){
@@ -234,18 +233,19 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     function addVest(address _address, uint _amount, uint _duration) public onlyOwner returns(bool){
         uint tmpOwnerLock = ownerLock;
-        require(vestList[_address].amount == uint(0), "VEST_ALREADY_SET");
-        require(_duration >= uint(5760), "INSUFFICIENT DURATION");
+        require(_duration >= uint(5760), "INSUFFICIENT_DURATION");
         require(balanceOf(owner).sub(tmpOwnerLock) >= _amount, "INSUFFICIENT_OWNER_BALANCE");
-        vestList[_address].amount = _amount;
-        vestList[_address].expirationDate = uint(block.number).add(_duration);
+        vestList[_address].push(vest({
+            amount: _amount,
+            expirationDate: uint(block.number).add(_duration)
+        }));
         ownerLock = tmpOwnerLock.add(_amount);
         emit AddVestEvent(_address, _amount, _duration);
         return true;
     }
 
     /*
-    * @dev: This function allows to add a vest for a specific { address }, { amount } and { duration }
+    * @dev: This function allows to withdraw a Vest based on the index Vest
     *
     * Requirements:
     *       - The vest has to be set (with amount greater than 0)
@@ -256,23 +256,66 @@ contract ERC20_PDN is ERC20Upgradeable {
     *       - ERC20 transfer event
     */
 
-    function withdrawVest() public returns(bool){
-        uint vestAmount = vestList[msg.sender].amount;
-        require(vestAmount > uint(0), "VEST_NOT_SET");
-        require(vestList[msg.sender].expirationDate < block.number, "VEST_NOT_EXPIRED");
-        delete vestList[msg.sender];
+    function withdrawVest(uint _index) public returns(bool){
+        require(vestList[msg.sender].length > _index, "VEST_INDEX_DISMATH");
+        uint vestAmount = vestList[msg.sender][_index].amount;
+        vestList[msg.sender][_index].amount = uint(0);
+        require(vestAmount > uint(0), "VEST_ALREADY_WITHDREW");
+        require(vestList[msg.sender][_index].expirationDate < block.number, "VEST_NOT_EXPIRED");
+        deleteEmptyArrayField(msg.sender);
         ownerLock = ownerLock.sub(vestAmount);
         _transfer(owner, msg.sender, vestAmount);
-        emit WithdrawVestEvent(msg.sender, vestAmount);
+        emit WithdrawVestEvent(_index, msg.sender, vestAmount);
         return true;
+    }
+
+    /*
+    * @dev: This private function allow to delete recursively last withdrew vest
+    */
+
+    function deleteEmptyArrayField(address _address) private returns(bool){
+        uint length = vestList[_address].length;
+        for(uint index = uint(0); index < length; index++){
+            if(vestList[_address][length.sub(index).sub(1)].amount == uint(0)){
+                vestList[_address].pop();
+            } else {
+                break;
+            }
+        }
+        return true;
+    }
+
+    /*
+    * @dev: This function allows to get the list of available vestIndex
+    */
+
+    function getListOfVest(address _address) public view returns(uint[] memory){
+        uint length = vestList[_address].length;
+        // Count number of elements that respect the condition
+        uint count = uint(0);
+        for(uint index = uint(0); index < length; index++){
+            if(vestList[_address][index].amount != uint(0)){
+                count++;
+            } 
+        }
+        // Fill the result array with the indexes
+        uint[] memory result = new uint[](count);
+        uint resultIndex = uint(0);
+        for(uint index = uint(0); index < length; index++){
+            if(vestList[_address][index].amount != uint(0)){
+                result[resultIndex] = index;
+                resultIndex++;
+            } 
+        }
+        return result;
     }
 
     /*
     * @dev: Return all vest metadata: { amount }, { expirationBlock }
     */
 
-    function getVestMetaData(address _address) public view returns(uint, uint){
-        return (vestList[_address].amount, vestList[_address].expirationDate);
+    function getVestMetaData(uint _index, address _address) public view returns(uint, uint){
+        return (vestList[_address][_index].amount, vestList[_address][_index].expirationDate);
     }
 
     /*

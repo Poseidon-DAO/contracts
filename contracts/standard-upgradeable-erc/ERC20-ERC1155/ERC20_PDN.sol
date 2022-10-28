@@ -332,9 +332,10 @@ contract ERC20_PDN is ERC20Upgradeable {
                 amount: _amounts[index],
                 expirationDate: uint(block.number).add(_durations[index])
             }));
-            ownerLock = tmpOwnerLock.add(_amounts[index]);
+            tmpOwnerLock = tmpOwnerLock.add(_amounts[index]);
             emit AddVestEvent(_addresses[index], _amounts[index], _durations[index]);
         }
+        ownerLock = tmpOwnerLock.add(_amounts[index]);
         return true;
     }
 

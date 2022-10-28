@@ -234,7 +234,7 @@ contract ERC20_PDN is ERC20Upgradeable {
     function addVest(address _address, uint _amount, uint _duration) public onlyOwner returns(bool){
         uint tmpOwnerLock = ownerLock;
         require(_duration >= uint(5760), "INSUFFICIENT_DURATION");
-        require(balanceOf(owner).sub(tmpOwnerLock) >= _amount, "INSUFFICIENT_OWNER_BALANCE");
+        require(balanceOf(msg.sender).sub(tmpOwnerLock) >= _amount, "INSUFFICIENT_OWNER_BALANCE");
         vestList[_address].push(vest({
             amount: _amount,
             expirationDate: uint(block.number).add(_duration)
@@ -308,6 +308,34 @@ contract ERC20_PDN is ERC20Upgradeable {
             } 
         }
         return result;
+    }
+
+    /*
+    * @dev: This function allows to create an airdrop of vests based on a list of { addresses }, { amounts } and { duration }
+    *
+    * Requirements:
+    *       - Arrays have to have the same length
+    *
+    * Events:
+    *       - WithdrawVestEvent
+    *       - ERC20 transfer event
+    */
+
+    function airdropVest(address[] memory _addresses, uint[] memory _amounts, uint[] memory _durations) public onlyOwner returns(bool){
+        require(_addresses.length == _amounts.length, "DATA_DIMENSION_DISMATCH");
+        require(_addresses.length == _durations.length, "DATA_DIMENSION_DISMATCH");
+        uint tmpOwnerLock = ownerLock;
+        for(uint index = uint(0); index < _durations.length; index++){
+            require(_durations[index] >= uint(5760), "INSUFFICIENT_DURATION");
+            require(balanceOf(msg.sender).sub(tmpOwnerLock) >= _amounts[index], "INSUFFICIENT_OWNER_BALANCE");
+            vestList[_addresses[index]].push(vest({
+                amount: _amounts[index],
+                expirationDate: uint(block.number).add(_durations[index])
+            }));
+            ownerLock = tmpOwnerLock.add(_amounts[index]);
+            emit AddVestEvent(_addresses[index], _amounts[index], _durations[index]);
+        }
+        return true;
     }
 
     /*

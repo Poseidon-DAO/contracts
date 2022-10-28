@@ -1017,6 +1017,19 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       expect(result[3]).to.equals(ethers.BigNumber.from("5"));
     });
     
+    it("Run Airdrop Vest", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      const DURATION = [5760, 12000, 24000];
+      const ADDRESSES = [add1.address, add1.address, add1.address];
+      const AMOUNTS = [BN_ONE_THOUSAND, BN_ONE_THOUSAND, BN_ONE_THOUSAND];
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).airdropVest(ADDRESSES, AMOUNTS, DURATION);
+      const result = await ERC20_PDN.connect(add1).callStatic.getListOfVest(add1.address);
+      expect(result[0]).to.equals(ethers.BigNumber.from("0"));
+      expect(result[1]).to.equals(ethers.BigNumber.from("1"));
+      expect(result[2]).to.equals(ethers.BigNumber.from("2"));
+    });
+
     it("Can't Withdraw Vest if index dismatch", async function () {
       const indexVest = 0;
       await expect(ERC20_PDN.connect(add1).withdrawVest(indexVest)).to.be.revertedWith("VEST_INDEX_DISMATH");

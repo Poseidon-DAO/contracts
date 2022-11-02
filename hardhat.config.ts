@@ -17,7 +17,7 @@ const mocha = require("./mocha-config");
 const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
-const MNEMONIC = "test test test test test test test test test test test junk";
+const MNEMONIC = process.env.MNEMONIC || ""; 
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",

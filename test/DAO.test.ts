@@ -111,21 +111,26 @@ describe("Unit Test: MultiSig", function () {
     AccessibilitySettings = await accessibilitySettingsDeploy();
     AccessibilitySettings.initialize();
     MultiSig = await multiSigDeploy();
-    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
   });
 
   it("createMultiSigPoll - Can't be run from stranger address", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await expect(MultiSig.connect(add1).createMultiSigPoll(pollTypeID, add2.address)).to.be.revertedWith("NOT_ABLE_TO_CREATE_A_MULTISIG_POLL");
+  });
 
+  it("createMultiSigPoll - Can't initialize if there are two identical address", async function () { 
+    await expect(MultiSig.initialize(AccessibilitySettings.address, [add1.address, add1.address, add3.address, add4.address, add5.address])).to.be.revertedWith("CANT_SET_TWO_TIME_THE_SAME_ADDRESS");
   });
 
   it("createMultiSigPoll - Can't set not valid ID", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.NULL;
     await expect(MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address)).to.be.revertedWith("POLL_ID_DISMATCH");
   });
 
   it("createMultiSigPoll - Change Creator", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const events = await MultiSig.queryFilter(MultiSig.filters.NewMultisigPollEvent());
@@ -137,6 +142,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Can't be run from stranger address", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -144,6 +150,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Can't vote two times for the same poll", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -152,6 +159,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote without actions (<3/5)", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -167,6 +175,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - change DAO creator", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     const oldOwner = await AccessibilitySettings.getDAOCreator();
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
@@ -179,6 +188,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Can't delete multisig if signature list lenght has minimum requirement", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, owner.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -188,6 +198,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Add new address on multisig", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     const oldAddressIsInMultisig = await MultiSig.multiSigDAO(add2.address);
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
@@ -200,6 +211,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Can't add new address on multisig if already present", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add5.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -210,6 +222,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions - Delete address on multisig", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     let pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(false);
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
@@ -231,6 +244,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions - Can't delete address on multisig if not present", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     let pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(false);
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
@@ -251,6 +265,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions - Can't delete address on multisig if minimum we don't have 5 addresses", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add5.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -260,6 +275,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions - Unfreeze", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.UNFREEZE;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, ZERO_ADDRESS);
     const pollIndex = await MultiSig.indexPoll();

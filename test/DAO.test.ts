@@ -1,3 +1,14 @@
+
+/*
+  _____               _     _               _____          ____  
+ |  __ \             (_)   | |             |  __ \   /\   / __ \ 
+ | |__) ___  ___  ___ _  __| | ___  _ __   | |  | | /  \ | |  | |
+ |  ___/ _ \/ __|/ _ | |/ _` |/ _ \| '_ \  | |  | |/ /\ \| |  | |
+ | |  | (_) \__ |  __| | (_| | (_) | | | | | |__| / ____ | |__| |
+ |_|   \___/|___/\___|_|\__,_|\___/|_| |_| |_____/_/    \_\____/ 
+                                                                 
+*/
+
 const { BN, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const { expect } = require('chai');
 const { ZERO_ADDRESS } = constants;
@@ -100,21 +111,26 @@ describe("Unit Test: MultiSig", function () {
     AccessibilitySettings = await accessibilitySettingsDeploy();
     AccessibilitySettings.initialize();
     MultiSig = await multiSigDeploy();
-    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
   });
 
   it("createMultiSigPoll - Can't be run from stranger address", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await expect(MultiSig.connect(add1).createMultiSigPoll(pollTypeID, add2.address)).to.be.revertedWith("NOT_ABLE_TO_CREATE_A_MULTISIG_POLL");
+  });
 
+  it("createMultiSigPoll - Can't initialize if there are two identical address", async function () { 
+    await expect(MultiSig.initialize(AccessibilitySettings.address, [add1.address, add1.address, add3.address, add4.address, add5.address])).to.be.revertedWith("CANT_SET_TWO_TIME_THE_SAME_ADDRESS");
   });
 
   it("createMultiSigPoll - Can't set not valid ID", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.NULL;
     await expect(MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address)).to.be.revertedWith("POLL_ID_DISMATCH");
   });
 
   it("createMultiSigPoll - Change Creator", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const events = await MultiSig.queryFilter(MultiSig.filters.NewMultisigPollEvent());
@@ -126,6 +142,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Can't be run from stranger address", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -133,6 +150,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Can't vote two times for the same poll", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -141,6 +159,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote without actions (<3/5)", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -156,6 +175,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - change DAO creator", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.CHANGE_CREATOR;
     const oldOwner = await AccessibilitySettings.getDAOCreator();
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
@@ -168,6 +188,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Can't delete multisig if signature list lenght has minimum requirement", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, owner.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -177,6 +198,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Add new address on multisig", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     const oldAddressIsInMultisig = await MultiSig.multiSigDAO(add2.address);
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
@@ -189,6 +211,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions (>=3/5) - Can't add new address on multisig if already present", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add5.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -199,6 +222,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions - Delete address on multisig", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     let pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(false);
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
@@ -220,6 +244,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions - Can't delete address on multisig if not present", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     let pollTypeID = pollTypeMetaData.ADD_ADDRESS_ON_MULTISIG_LIST;
     expect(await MultiSig.multiSigDAO(add2.address)).to.equals(false);
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add2.address);
@@ -240,6 +265,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions - Can't delete address on multisig if minimum we don't have 5 addresses", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.DELETE_ADDRESS_ON_MULTISIG_LIST;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, add5.address);
     const pollIndex = await MultiSig.indexPoll();
@@ -249,6 +275,7 @@ describe("Unit Test: MultiSig", function () {
   });
 
   it("voteMultiSigPoll - Vote with actions - Unfreeze", async function () {
+    await MultiSig.initialize(AccessibilitySettings.address, multiSigAddressList);
     const pollTypeID = pollTypeMetaData.UNFREEZE;
     await MultiSig.connect(owner).createMultiSigPoll(pollTypeID, ZERO_ADDRESS);
     const pollIndex = await MultiSig.indexPoll();
@@ -280,7 +307,7 @@ describe("Unit Test: Dynamic ERC20 Token", function () {
     Accountability = await accountabilityDeploy();
     Accountability.initialize(AccessibilitySettings.address, SECURITY_DELAY);
     DynamicERC20Upgradeable = await dynamicERC20UpgradeableDeploy();
-    await DynamicERC20Upgradeable.connect(owner).initialize(Accountability.address, "TOKEN_NAME_1", "TOKEN_SYM_1", BN_BILLION, DECIMALS);
+    await DynamicERC20Upgradeable.connect(owner).initialize(Accountability.address, "TOKEN_NAME_1", "TOKEN_SYM_1", BN_BILLION, DECIMALS, add8.address);
   });
 
   it("Dynamic ERC20 Upgradeable - Accountability Address on DERC20U match the smart contract accountability address", async function () {
@@ -288,20 +315,20 @@ describe("Unit Test: Dynamic ERC20 Token", function () {
   });
 
   it("Dynamic ERC20 Upgradeable - Init new token - Check Accountability Token Referee", async function () {
-    expect(await Accountability.tokenReferreal(DynamicERC20Upgradeable.address)).to.equals(owner.address);
+    expect(await Accountability.tokenReferreal(DynamicERC20Upgradeable.address)).to.equals(add8.address);
   });
 
   it("Dynamic ERC20 Upgradeable - A non init token has getLastBlockUserOp = 0", async function () {
-    expect(await Accountability.getLastBlockUserOp(DynamicERC20Upgradeable.address, owner.address)).not.to.equals(ethers.BigNumber.from("0"));
+    expect(await Accountability.getLastBlockUserOp(DynamicERC20Upgradeable.address, add8.address)).not.to.equals(ethers.BigNumber.from("0"));
   });
 
   it("Dynamic ERC20 Upgradeable - Init new token - getLastBlockUserOp has to be > 0", async function () {
-    expect(await Accountability.getLastBlockUserOp(DynamicERC20Upgradeable.address, owner.address)).not.to.equals(ethers.BigNumber.from("0"));
+    expect(await Accountability.getLastBlockUserOp(DynamicERC20Upgradeable.address, add8.address)).not.to.equals(ethers.BigNumber.from("0"));
   });
 
   it("Dynamic ERC20 Upgradeable - Can't init if not multisig", async function () {
     DynamicERC20Upgradeable = await dynamicERC20UpgradeableDeploy();
-    await expect(DynamicERC20Upgradeable.connect(add1).initialize(Accountability.address, "TOKEN_NAME_1", "TOKEN_SYM_1", BN_BILLION, DECIMALS)).to.be.revertedWith("REQUIRE_MULTISIG");
+    await expect(DynamicERC20Upgradeable.connect(add1).initialize(Accountability.address, "TOKEN_NAME_1", "TOKEN_SYM_1", BN_BILLION, DECIMALS, add8.address)).to.be.revertedWith("REQUIRE_MULTISIG");
   });
 });
 
@@ -482,7 +509,7 @@ describe("Unit Test: Accountability", function () {
     accountability = await accountabilityDeploy();                 // to run properly all variables
     accountability.initialize(accessibilitySettings.address, SECURITY_DELAY);
     dynamicERC20Upgradeable = await dynamicERC20UpgradeableDeploy();      // inside of them
-    await dynamicERC20Upgradeable.initialize(accountability.address, "TOKEN_NAME_1", "TOKEN_SYM_1", BN_BILLION, DECIMALS);
+    await dynamicERC20Upgradeable.initialize(accountability.address, "TOKEN_NAME_1", "TOKEN_SYM_1", BN_BILLION, DECIMALS, owner.address);
   });
 
   it("Check if after depoly DAO Creator is in Admin User Group", async function () {
@@ -703,8 +730,8 @@ describe("Unit Test: Accountability", function () {
     // CREATE TOKENS
     const dynamicERC20Upgradeable2 = await dynamicERC20UpgradeableDeploy();      // inside of them
     const dynamicERC20Upgradeable3 = await dynamicERC20UpgradeableDeploy();      // inside of them
-    await dynamicERC20Upgradeable2.initialize(accountability.address, "TOKEN_NAME_2", "TOKEN_SYM_2", BN_BILLION, DECIMALS);
-    await dynamicERC20Upgradeable3.initialize(accountability.address, "TOKEN_NAME_3", "TOKEN_SYM_3", BN_BILLION, DECIMALS);
+    await dynamicERC20Upgradeable2.initialize(accountability.address, "TOKEN_NAME_2", "TOKEN_SYM_2", BN_BILLION, DECIMALS, owner.address);
+    await dynamicERC20Upgradeable3.initialize(accountability.address, "TOKEN_NAME_3", "TOKEN_SYM_3", BN_BILLION, DECIMALS, owner.address);
     const tokenList = [dynamicERC20Upgradeable.address, dynamicERC20Upgradeable2.address, dynamicERC20Upgradeable3.address];
     // ADD LOCAL BALANCE TO AN ADDRESS
     await accountability.connect(owner).addBalance(tokenList[0], add1.address, BN_TEN_THOUSAND_WITH_DEC);
@@ -761,14 +788,13 @@ describe("Unit Test: Accountability", function () {
     // CREATE TOKENS
     const dynamicERC20Upgradeable2 = await dynamicERC20UpgradeableDeploy();      // inside of them
     const dynamicERC20Upgradeable3 = await dynamicERC20UpgradeableDeploy();      // inside of them
-    await dynamicERC20Upgradeable2.initialize(accountability.address, "TOKEN_NAME_2", "TOKEN_SYM_2", BN_BILLION, DECIMALS);
-    await dynamicERC20Upgradeable3.initialize(accountability.address, "TOKEN_NAME_3", "TOKEN_SYM_3", BN_BILLION, DECIMALS);
+    await dynamicERC20Upgradeable2.initialize(accountability.address, "TOKEN_NAME_2", "TOKEN_SYM_2", BN_BILLION, DECIMALS, add1.address);
+    await dynamicERC20Upgradeable3.initialize(accountability.address, "TOKEN_NAME_3", "TOKEN_SYM_3", BN_BILLION, DECIMALS, add1.address);
     const tokenList = [dynamicERC20Upgradeable.address, dynamicERC20Upgradeable2.address, dynamicERC20Upgradeable3.address];
     for (let index = 0; index < SECURITY_DELAY; index++) { await ethers.provider.send("evm_mine"); }
     await expect(accountability.connect(add1).redeemListOfERC20(tokenList)).to.be.revertedWith("NO_TOKENS");
   });
 
-  // --do all negative tests for redeem
 });
 
 // ----------------------------------------------------------------------------------------------- SMART CONTRACT DEPLOYMENT
@@ -820,7 +846,7 @@ describe("ERC20-ERC1155 Hybrid system", function () {
   it("Stranger can't run Airdrop", async function () {
     const airdropAddressList = [add1.address, add2.address, add3.address];
     const amountList = [ONE_THOUSAND, FIVE_THOUSAND, TEN_THOUSAND];
-    await expect(ERC20_PDN.connect(add1).runAirdrop(airdropAddressList, amountList, DECIMALS)).to.be.revertedWith("ONLY_OWNER_CAN_RUN_THIS_FUNCTION");
+    await expect(ERC20_PDN.connect(add1).runAirdrop(airdropAddressList, amountList, DECIMALS)).to.be.revertedWith("ONLY_ADMIN_CAN_RUN_THIS_FUNCTION");
   });
 
   it("Can't run Airdrop if data dimension dismatch", async function () {
@@ -929,7 +955,7 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
-      await expect(ERC1155_PDN.connect(add1).safeTransferFrom(add1.address, add2.address, ERC1155_PDN_ID, 1, BYTES4DATA[0])).to.be.revertedWith("FUNCTION_OVERRIDE_TRANSFER_NOT_ALLOWED");
+      await expect(ERC1155_PDN.connect(add1).safeTransferFrom(add1.address, add2.address, ERC1155_PDN_ID, 1, BYTES4DATA[0])).to.be.reverted;
     });
 
     it("Override safeBatchTransferFrom function of ERC1155 - function not allowed", async function () {
@@ -941,7 +967,7 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       await ERC20_PDN.connect(add1).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add2).burnAndReceiveNFT(BN_ONE_THOUSAND); 
       await ERC20_PDN.connect(add3).burnAndReceiveNFT(BN_FIVE_THOUSAND);
-      await expect(ERC1155_PDN.connect(add1).safeBatchTransferFrom(add1.address, add2.address, [ERC1155_PDN_ID], [1], BYTES4DATA[0])).to.be.revertedWith("FUNCTION_OVERRIDE_TRANSFER_BATCH_NOT_ALLOWED");
+      await expect(ERC1155_PDN.connect(add1).safeBatchTransferFrom(add1.address, add2.address, [ERC1155_PDN_ID], [1], BYTES4DATA[0])).to.be.reverted;
     });
 
     // Vesting test
@@ -950,7 +976,7 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       const RATIO = BN_ONE_THOUSAND;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
       const tx = await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
-      const vestMetaData = await ERC20_PDN.getVestMetaData(add1.address);
+      const vestMetaData = await ERC20_PDN.getVestMetaData(0, add1.address);
       await expect(vestMetaData[0]).to.equals(BN_ONE_THOUSAND_WITH_DEC);
       await expect(vestMetaData[1]).to.equals(ethers.BigNumber.from(tx.blockNumber).add(SIX_MONTHS_BLOCKS));
       expect (await ERC20_PDN.ownerLock()).to.equals(ethers.BigNumber.from(BN_ONE_THOUSAND_WITH_DEC));
@@ -978,13 +1004,6 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       expect (await ERC20_PDN.ownerLock()).to.equals(ethers.BigNumber.from(0));
     });
     */
-   
-    it("Can't Add Vest if it is already set", async function () {
-      const RATIO = BN_ONE_THOUSAND;
-      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
-      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
-      await expect(ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS)).to.be.revertedWith("VEST_ALREADY_SET");
-    });
 
     it("Can't Add Vest if owner balance is not sufficient", async function () {
       const RATIO = BN_ONE_THOUSAND;
@@ -993,28 +1012,72 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       await expect(ERC20_PDN.connect(owner).addVest(add2.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS)).to.be.revertedWith("INSUFFICIENT_OWNER_BALANCE");
     });
 
-    /*
+    
     it("Withdraw Vest", async function () {
       const RATIO = BN_ONE_THOUSAND;
-      const DURATION = 5;
+      const DURATION = 5760;
       await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
       await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION);
       for (let index = 0; index < DURATION; index++) { await ethers.provider.send("evm_mine"); }
-      await ERC20_PDN.connect(add1).withdrawVest();
-      const vestMetaData = await ERC20_PDN.getVestMetaData(add1.address);
-      await expect(vestMetaData[0]).to.equals(0);
-      await expect(vestMetaData[1]).to.equals(0);
+      await ERC20_PDN.connect(add1).withdrawVest(0);
       expect(await ERC20_PDN.balanceOf(add1.address)).to.equals(BN_ONE_THOUSAND_WITH_DEC);
     });
-    */
-
-    it("Can't Withdraw Vest if not set", async function () {
-      await expect(ERC20_PDN.connect(add1).withdrawVest()).to.be.revertedWith("VEST_NOT_SET");
+    
+    it("Get List of Available Vest", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      const DURATION = 5760;
+      const DURATION_LONG = 10000;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION_LONG);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION_LONG);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION_LONG);
+      for (let index = 0; index < DURATION; index++) { await ethers.provider.send("evm_mine"); }
+      await ERC20_PDN.connect(add1).withdrawVest(1);
+      await ERC20_PDN.connect(add1).withdrawVest(2);
+      const result = await ERC20_PDN.connect(add1).callStatic.getListOfVest(add1.address);
+      expect(result[0]).to.equals(ethers.BigNumber.from("0"));
+      expect(result[1]).to.equals(ethers.BigNumber.from("3"));
+      expect(result[2]).to.equals(ethers.BigNumber.from("4"));
+      expect(result[3]).to.equals(ethers.BigNumber.from("5"));
+    });
+    
+    it("Run Airdrop Vest", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      const DURATION = [5760, 12000, 24000];
+      const ADDRESSES = [add1.address, add1.address, add1.address];
+      const AMOUNTS = [BN_ONE_THOUSAND, BN_ONE_THOUSAND, BN_ONE_THOUSAND];
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).airdropVest(ADDRESSES, AMOUNTS, DURATION);
+      const result = await ERC20_PDN.connect(add1).callStatic.getListOfVest(add1.address);
+      expect(result[0]).to.equals(ethers.BigNumber.from("0"));
+      expect(result[1]).to.equals(ethers.BigNumber.from("1"));
+      expect(result[2]).to.equals(ethers.BigNumber.from("2"));
     });
 
+    it("Can't Withdraw Vest if index dismatch", async function () {
+      const indexVest = 0;
+      await expect(ERC20_PDN.connect(add1).withdrawVest(indexVest)).to.be.revertedWith("VEST_INDEX_DISMATH");
+    });
+
+    it("Can't Withdraw Vest if it's already withdrew", async function () {
+      const RATIO = BN_ONE_THOUSAND;
+      const DURATION = 5760;
+      const LONG_DURATION = 10000;
+      await ERC20_PDN.setERC1155(ERC1155_PDN.address, ERC1155_PDN_ID, RATIO);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, DURATION);
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, LONG_DURATION);
+      for (let index = 0; index < DURATION; index++) { await ethers.provider.send("evm_mine"); }
+      await ERC20_PDN.connect(add1).withdrawVest(0);
+      const indexVest = 0;
+      await expect(ERC20_PDN.connect(add1).withdrawVest(indexVest)).to.be.revertedWith("VEST_ALREADY_WITHDREW");
+    });
     it("Can't Withdraw Vest if not expired", async function () {
       await ERC20_PDN.connect(owner).addVest(add1.address, BN_ONE_THOUSAND_WITH_DEC, SIX_MONTHS_BLOCKS);
-      await expect(ERC20_PDN.connect(add1).withdrawVest()).to.be.revertedWith("VEST_NOT_EXPIRED");
+      const indexVest = 0;
+      await expect(ERC20_PDN.connect(add1).withdrawVest(indexVest)).to.be.revertedWith("VEST_NOT_EXPIRED");
     });
     
     it("Can't Run withdraw if locked amount is greater than amounts requests", async function () {

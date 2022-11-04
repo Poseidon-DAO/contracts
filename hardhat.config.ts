@@ -8,6 +8,8 @@ import "@typechain/hardhat";
 import "@nomiclabs/hardhat-etherscan";
 import "hardhat-abi-exporter";
 import "@nomiclabs/hardhat-web3";
+import "@nomicfoundation/hardhat-toolbox";
+
 // TODO: reenable solidity-coverage when it works
 // import "solidity-coverage";
 const mocha = require("./mocha-config");
@@ -15,7 +17,7 @@ const mocha = require("./mocha-config");
 const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
-const MNEMONIC = process.env.MNEMONIC || "";
+const MNEMONIC = process.env.MNEMONIC || ""; 
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",

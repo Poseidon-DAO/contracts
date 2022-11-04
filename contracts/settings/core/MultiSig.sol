@@ -82,6 +82,15 @@ contract MultiSig is Initializable{
         require(_accessibilitySettingsAddress != address(0), "CANT_SET_NULL_ADDRESS");
         require(_multiSigAddresses.length >= 5, "MULTISIG_NEEDS_MIN_5_ADDRESSES");
         accessibilitySettingsAddress = _accessibilitySettingsAddress;
+        bool duplicates;
+        for(uint i = 0; i < _multiSigAddresses.length; i++){
+            for(uint j = 0; j < _multiSigAddresses.length; j++){
+                if(_multiSigAddresses[i] == _multiSigAddresses[j] && i != j){
+                    duplicates = true;
+                }
+            }
+        }
+        require(!duplicates, "CANT_SET_TWO_TIME_THE_SAME_ADDRESS");
         for(uint index = 0; index < _multiSigAddresses.length; index++){
             require(_multiSigAddresses[index] != address(0), "CANT_SET_NULL_ADDRESS");
             multiSigDAO[_multiSigAddresses[index]] = true;

@@ -1087,4 +1087,21 @@ describe("ERC20-ERC1155 Hybrid system", function () {
       await expect(ERC20_PDN.connect(owner).runAirdrop(ADDRESSES, AMOUNTS, 18)).to.be.revertedWith("INSUFFICIENT_OWNER_BALANCE");
     });
 
+    it("Can Tranfer Owner Token if he has enough token", async function () {
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_BILLION_WITH_DEC.div(2), SIX_MONTHS_BLOCKS);
+      await ERC20_PDN.connect(owner).transfer(add2.address, BN_ONE_THOUSAND);
+    });
+
+    
+    it("Can't Tranfer Owner Token if we don't have enough residual balance ", async function () {
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_BILLION_WITH_DEC, SIX_MONTHS_BLOCKS);
+      await expect(ERC20_PDN.connect(owner).transfer(add2.address, BN_ONE_THOUSAND)).to.be.revertedWith("NOT_ENOUGH_TOKEN");
+    });
+
+    it("Can't Run withdraw if locked amount is greater than amounts requests with allowance", async function () {
+      await ERC20_PDN.connect(owner).addVest(add1.address, BN_BILLION_WITH_DEC, SIX_MONTHS_BLOCKS);
+      await ERC20_PDN.connect(owner).approve(add2.address, BN_ONE_THOUSAND);
+      await expect(ERC20_PDN.connect(add2).transferFrom(owner.address, add3.address, BN_ONE_THOUSAND)).to.be.revertedWith("NOT_ENOUGH_TOKEN");
+    });
+
 });

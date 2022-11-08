@@ -36,7 +36,6 @@ contract ERC20_PDN is ERC20Upgradeable {
 
     mapping(address => vest[]) vestList;
 
-
     event ERC1155SetEvent(address indexed owner, address ERC1155address, uint ERC1155ID, uint ratio);
     event DAOConnectionEvent(address indexed owner, address AccessibilitySettingsAddress);
     event OwnerChangeEvent(address indexed oldOwner, address indexed newOwner);
@@ -122,7 +121,7 @@ contract ERC20_PDN is ERC20Upgradeable {
     * @dev: This function connects this smart contract to the DAO
     *
     * Requirements:
-    *       - Who create the Accessibility Settings Smqart contract has to be the owner of the smart contract
+    *       - Who create the Accessibility Settings Smart contract has to be the owner of the smart contract
     *         and the address that take the signature
     *
     * Events:
@@ -360,6 +359,23 @@ contract ERC20_PDN is ERC20Upgradeable {
     function deleteVest(address _address) public returns(bool){
         require(IAccessibilitySettings(AccessibilitySettingsAddress).getMultiSigRefAddress() == msg.sender, "MULTISIG_CALLER_ADDRESS_DISMATCH");
         delete vestList[_address];
+        return true;
+    }
+
+    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        if(msg.sender == owner) {
+            require(balanceOf(msg.sender).sub(ownerLock) >= amount, "NOT_ENOUGH_TOKEN");
+        }
+        _transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
+        if(from == owner) {
+            require(balanceOf(from).sub(ownerLock) >= amount, "NOT_ENOUGH_TOKEN");
+        }
+        _spendAllowance(from, msg.sender, amount);
+        _transfer(from, to, amount);
         return true;
     }
 }
